@@ -93,6 +93,7 @@ namespace Deadlight.Enemy
                     var hp = mini.AddComponent<EnemyHealth>();
                     hp.SetMaxHealth(20f);
                     hp.SetPointsOnDeath(5);
+                    hp.SetCountsTowardWave(false);
                     
                     var aiComp = mini.AddComponent<SimpleEnemyAI>();
                     aiComp.ApplySpeedMultiplier(1.3f);

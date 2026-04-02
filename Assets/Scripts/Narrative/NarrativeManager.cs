@@ -207,7 +207,21 @@ namespace Deadlight.Narrative
                 dialogueUI.ShowDialogue(dialogue);
             }
 
-            foreach (var line in dialogue.Lines)
+            var lines = dialogue.Lines;
+            if (lines == null || lines.Length == 0)
+            {
+                if (hasDialogueUI)
+                {
+                    dialogueUI.HideDialogue();
+                }
+
+                OnDialogueEnded?.Invoke(dialogue);
+                currentDialogue = null;
+                isPlaying = false;
+                yield break;
+            }
+
+            foreach (var line in lines)
             {
                 OnLineDisplayed?.Invoke(line);
 

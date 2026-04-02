@@ -329,3 +329,26 @@ Assets/
 3. Click "Build"
 4. Choose output folder
 5. The build creates `YourGame.exe` + `YourGame_Data/` folder
+
+## Deliverable 2 Submission
+
+To avoid including extra/generated folders in your zip, use the packaging helper:
+
+```bash
+scripts/prepare_deliverable2.sh \
+  --team Group16 \
+  --windows-build Builds/Windows \
+  --report "Deliverable 2 (1).pdf"
+```
+
+Quick input validation without copying/zipping:
+
+```bash
+scripts/prepare_deliverable2.sh \
+  --team Group16 \
+  --windows-build Builds/Windows \
+  --report "Deliverable 2 (1).pdf" \
+  --validate-only
+```
+
+Use `DELIVERABLE2_CHECKLIST.md` before final upload to ensure rubric coverage and required contents are complete.

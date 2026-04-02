@@ -35,6 +35,7 @@ namespace Deadlight.Enemy
         [SerializeField] private bool isExploder = false;
         [SerializeField] private float explosionRadius = 3f;
         [SerializeField] private float explosionDamage = 30f;
+        [SerializeField] private bool countsTowardWave = true;
 
         public float MaxHealth => maxHealth;
         public float CurrentHealth => currentHealth;
@@ -139,9 +140,14 @@ namespace Deadlight.Enemy
                     sr != null ? sr.color : Color.gray);
             }
 
-            var waveManager = FindFirstObjectByType<WaveManager>();
-            if (waveManager != null)
-                waveManager.RegisterEnemyDeath();
+            if (countsTowardWave)
+            {
+                var waveManager = FindFirstObjectByType<WaveManager>();
+                if (waveManager != null)
+                {
+                    waveManager.RegisterEnemyDeath();
+                }
+            }
 
             var pointsSystem = FindFirstObjectByType<PointsSystem>();
             if (pointsSystem != null)
@@ -213,6 +219,11 @@ namespace Deadlight.Enemy
         public void SetIsExploder(bool exploder)
         {
             isExploder = exploder;
+        }
+
+        public void SetCountsTowardWave(bool value)
+        {
+            countsTowardWave = value;
         }
 
         private void TryDropLoot()

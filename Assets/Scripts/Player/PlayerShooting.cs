@@ -281,7 +281,10 @@ namespace Deadlight.Player
         private void TryReload()
         {
             if (isReloading) return;
-            if (currentAmmo >= currentWeapon.magazineSize) return;
+            if (currentWeapon == null) return;
+
+            int effectiveMag = currentWeapon.magazineSize + (PlayerUpgrades.Instance != null ? PlayerUpgrades.Instance.MagazineBonus : 0);
+            if (currentAmmo >= effectiveMag) return;
             if (reserveAmmo <= 0) return;
 
             StartCoroutine(ReloadCoroutine());

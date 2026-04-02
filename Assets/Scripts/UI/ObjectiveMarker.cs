@@ -28,7 +28,14 @@ namespace Deadlight.UI
             CreateCanvas();
 
             if (GameManager.Instance != null)
+            {
                 GameManager.Instance.OnGameStateChanged += OnGameStateChanged;
+
+                if (GameManager.Instance.CurrentState == GameState.DayPhase)
+                {
+                    StartCoroutine(FindTargetsDelayed());
+                }
+            }
         }
 
         private void OnDestroy()

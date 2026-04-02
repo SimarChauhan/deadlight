@@ -272,8 +272,11 @@ namespace Deadlight.Systems
                 case PickupType.Health:
                     if (playerHealth != null)
                     {
-                        playerHealth.Heal(value);
-                        didCollect = true;
+                        if (playerHealth.CurrentHealth < playerHealth.MaxHealth)
+                        {
+                            playerHealth.Heal(value);
+                            didCollect = true;
+                        }
                     }
                     break;
 

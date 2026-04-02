@@ -10,7 +10,8 @@ namespace Deadlight.Enemy
         private float elapsed;
         private SpriteRenderer spriteRenderer;
         private Color originalColor;
-        private EnemyHealth health;
+        private EnemyHealth enemyHealth;
+        private Deadlight.Player.PlayerHealth playerHealth;
         
         public void Initialize(float dps, float dur)
         {
@@ -20,7 +21,8 @@ namespace Deadlight.Enemy
         
         void Start()
         {
-            health = GetComponent<EnemyHealth>();
+            enemyHealth = GetComponent<EnemyHealth>();
+            playerHealth = GetComponent<Deadlight.Player.PlayerHealth>();
             spriteRenderer = GetComponent<SpriteRenderer>();
             if (spriteRenderer != null)
                 originalColor = spriteRenderer.color;
@@ -31,8 +33,20 @@ namespace Deadlight.Enemy
         {
             while (elapsed < duration)
             {
-                if (health == null || !health.IsAlive) break;
-                health.TakeDamage(damagePerSecond * Time.deltaTime);
+                if (enemyHealth != null)
+                {
+                    if (!enemyHealth.IsAlive) break;
+                    enemyHealth.TakeDamage(damagePerSecond * Time.deltaTime);
+                }
+                else if (playerHealth != null)
+                {
+                    if (!playerHealth.IsAlive) break;
+                    playerHealth.TakeDamage(damagePerSecond * Time.deltaTime);
+                }
+                else
+                {
+                    break;
+                }
                 
                 if (spriteRenderer != null)
                 {

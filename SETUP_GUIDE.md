@@ -206,3 +206,26 @@ To build:
 3. Click Build
 4. Choose output folder
 5. Test the .exe runs correctly
+
+## Deliverable 2 Packaging
+
+After creating your Windows build, package a clean submission zip from the repo root:
+
+```bash
+scripts/prepare_deliverable2.sh \
+  --team Group16 \
+  --windows-build Builds/Windows \
+  --report "Deliverable 2 (1).pdf"
+```
+
+Validate inputs only:
+
+```bash
+scripts/prepare_deliverable2.sh \
+  --team Group16 \
+  --windows-build Builds/Windows \
+  --report "Deliverable 2 (1).pdf" \
+  --validate-only
+```
+
+Use `DELIVERABLE2_CHECKLIST.md` to verify rubric coverage and submission completeness before upload.

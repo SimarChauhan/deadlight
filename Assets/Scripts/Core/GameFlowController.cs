@@ -147,19 +147,12 @@ namespace Deadlight.Core
         }
 
         /// <summary>
-        /// Call when the player clicks Continue in the Dawn/Shop phase. Awards points and advances to next night.
+        /// Call when the player clicks Continue in the Dawn/Shop phase and advance to next night.
         /// </summary>
         public void RequestDawnContinue()
         {
             if (GameManager.Instance == null || GameManager.Instance.CurrentState != GameState.DawnPhase)
                 return;
-
-            // Award points for surviving the night
-            if (PointsSystem.Instance != null)
-            {
-                int points = 100 + (GameManager.Instance.CurrentNight * 50);
-                PointsSystem.Instance.AddPoints(points, "Night Survived");
-            }
 
             OnDawnPhaseEnded?.Invoke();
             GameManager.Instance.AdvanceToNextNight();
@@ -335,6 +328,7 @@ namespace Deadlight.Core
                     ResetDayContestedDropState();
                     SpawnPickups();
                     SpawnSupplyCrates();
+                    EnsureDayObjectiveForCurrentNight();
                     SpawnObjectiveInteractables();
                     ScheduleDayContestedDrop();
                     OnStatusMessage?.Invoke($"Day Phase - Night {GameManager.Instance?.CurrentNight ?? 1}");
@@ -379,11 +373,6 @@ namespace Deadlight.Core
             if (GameManager.Instance?.CurrentState == GameState.DayPhase && !dayContestedDropSpawned)
             {
                 ScheduleDayContestedDrop();
-            }
-
-            if (DayObjectiveSystem.Instance != null)
-            {
-                DayObjectiveSystem.Instance.GenerateObjective(night, Time.frameCount + night * 991);
             }
 
             if (RunModifierSystem.Instance != null)
@@ -661,6 +650,17 @@ namespace Deadlight.Core
                     SpawnLargeCache(playerPos);
                     break;
             }
+        }
+
+        private void EnsureDayObjectiveForCurrentNight()
+        {
+            if (DayObjectiveSystem.Instance == null || DayObjectiveSystem.Instance.ActiveObjective != null)
+            {
+                return;
+            }
+
+            int night = GameManager.Instance?.CurrentNight ?? 1;
+            DayObjectiveSystem.Instance.GenerateObjective(night, Time.frameCount + night * 991);
         }
 
         private void SpawnSecureZones(int count, Vector3 playerPos)

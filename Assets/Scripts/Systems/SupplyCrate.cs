@@ -343,7 +343,7 @@ namespace Deadlight.Systems
             if (FloatingTextManager.Instance != null)
                 FloatingTextManager.Instance.SpawnText(reward, transform.position + Vector3.up * 0.5f, GetTierColor());
 
-            if (DayObjectiveSystem.Instance != null)
+            if (DayObjectiveSystem.Instance != null && GameManager.Instance?.CurrentState == GameState.DayPhase)
                 DayObjectiveSystem.Instance.AddProgress(1);
 
             try

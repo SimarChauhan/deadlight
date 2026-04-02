@@ -182,6 +182,7 @@ namespace Deadlight.Enemy
                 var hp = minion.AddComponent<EnemyHealth>();
                 hp.SetMaxHealth(currentPhase >= BossPhase.Phase2 ? 20f : 30f);
                 hp.SetPointsOnDeath(10);
+                hp.SetCountsTowardWave(false);
                 
                 minion.AddComponent<SimpleEnemyAI>();
             }

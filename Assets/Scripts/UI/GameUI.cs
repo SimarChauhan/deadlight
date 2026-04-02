@@ -837,13 +837,20 @@ namespace Deadlight.UI
             UpdateSupplyButton(0, 50);
             UpdateSupplyButton(1, 30);
 
-            // Weapon buttons (indices 2..8)
+            // Armor buttons (indices 2..5)
+            UpdateArmorButton(2, ArmorTier.Level1, false, 80);
+            UpdateArmorButton(3, ArmorTier.Level2, false, 180);
+            UpdateArmorButton(4, ArmorTier.Level1, true, 60);
+            UpdateArmorButton(5, ArmorTier.Level2, true, 140);
+
+            // Weapon buttons (indices 6..12)
             WeaponType[] weaponTypes = { WeaponType.Shotgun, WeaponType.SMG, WeaponType.SniperRifle, WeaponType.AssaultRifle, WeaponType.GrenadeLauncher, WeaponType.Flamethrower, WeaponType.Railgun };
             int[] weaponCosts = { 100, 150, 250, 200, 350, 400, 500 };
             int[] weaponNights = { 1, 2, 2, 3, 4, 4, 5 };
+            const int weaponButtonStartIndex = 6;
             for (int i = 0; i < weaponTypes.Length; i++)
             {
-                int btnIdx = 2 + i;
+                int btnIdx = weaponButtonStartIndex + i;
                 if (btnIdx >= _shopBuyButtons.Count) break;
                 var btn = _shopBuyButtons[btnIdx];
                 bool sold = _purchasedWeapons.Contains(weaponTypes[i]);
@@ -853,7 +860,7 @@ namespace Deadlight.UI
 
                 var labelText = btn.GetComponentInChildren<Text>();
                 if (labelText != null)
-                    labelText.text = sold ? "SOLD" : "BUY";
+                    labelText.text = sold ? "SOLD" : (unlocked ? "BUY" : "LOCKED");
             }
 
             // Upgrade buttons and labels
@@ -877,6 +884,32 @@ namespace Deadlight.UI
         {
             if (index >= _shopBuyButtons.Count) return;
             _shopBuyButtons[index].interactable = PointsSystem.Instance != null && PointsSystem.Instance.CanAfford(cost);
+        }
+
+        private void UpdateArmorButton(int index, ArmorTier tier, bool isHelmet, int cost)
+        {
+            if (index >= _shopBuyButtons.Count)
+            {
+                return;
+            }
+
+            var btn = _shopBuyButtons[index];
+            bool canAfford = PointsSystem.Instance != null && PointsSystem.Instance.CanAfford(cost);
+            bool alreadyOwned = false;
+
+            if (PlayerArmor.Instance != null)
+            {
+                var currentTier = isHelmet ? PlayerArmor.Instance.HelmetTier : PlayerArmor.Instance.VestTier;
+                float durability = isHelmet ? PlayerArmor.Instance.HelmetDurability : PlayerArmor.Instance.VestDurability;
+                alreadyOwned = tier <= currentTier && durability > 0f;
+            }
+
+            btn.interactable = !alreadyOwned && canAfford;
+            var labelText = btn.GetComponentInChildren<Text>();
+            if (labelText != null)
+            {
+                labelText.text = alreadyOwned ? "OWNED" : "BUY";
+            }
         }
 
         private void UpdateUpgradeRow(int index, int currentTier, int maxTier, int cost, string desc, string name)

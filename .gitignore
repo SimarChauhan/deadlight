@@ -81,3 +81,10 @@ Desktop.ini
 # PDF deliverables (keep in repo but ignore for cleaner commits)
 # Uncomment if you don't want PDFs in repo:
 # *.pdf
+
+# Local tooling artifacts
+output/
+tmp/unity_compile_now.log
+tmp/pdfs/deliverable2_user/
+tmp/mock_windows_build/
+tmp/submission_test/

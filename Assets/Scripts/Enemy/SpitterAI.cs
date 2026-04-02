@@ -170,8 +170,8 @@ namespace Deadlight.Enemy
                 if (burn == null)
                 {
                     burn = other.gameObject.AddComponent<BurnEffect>();
-                    burn.Initialize(2f, 2f);
                 }
+                burn.Initialize(2f, 2f);
             }
 
             Destroy(gameObject);
