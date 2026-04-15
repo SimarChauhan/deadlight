@@ -12,12 +12,13 @@ namespace Deadlight.UI
         // ── Palette ──────────────────────────────────────────
         public static readonly Color BgDark       = new Color(0.06f, 0.07f, 0.09f, 1f);
         public static readonly Color BgMedium     = new Color(0.10f, 0.12f, 0.15f, 1f);
-        public static readonly Color BgLight      = new Color(0.14f, 0.16f, 0.20f, 1f);
+        public static readonly Color BgLight      = new Color(0.17f, 0.19f, 0.24f, 1f);
         public static readonly Color BgOverlay    = new Color(0.02f, 0.02f, 0.04f, 0.88f);
 
         public static readonly Color TextPrimary  = new Color(0.94f, 0.96f, 0.98f, 1f);
-        public static readonly Color TextSecondary = new Color(0.70f, 0.75f, 0.82f, 1f);
-        public static readonly Color TextMuted    = new Color(0.48f, 0.52f, 0.58f, 1f);
+        public static readonly Color TextSecondary = new Color(0.82f, 0.86f, 0.91f, 1f);
+        public static readonly Color TextMuted    = new Color(0.63f, 0.68f, 0.75f, 1f);
+        public static readonly Color TextShadow   = new Color(0f, 0f, 0f, 0.34f);
 
         public static readonly Color AccentGreen  = new Color(0.28f, 0.72f, 0.40f, 1f);
         public static readonly Color AccentGold   = new Color(0.92f, 0.78f, 0.28f, 1f);
@@ -40,8 +41,8 @@ namespace Deadlight.UI
         public const int FontTitle     = 36;
         public const int FontHeading   = 26;
         public const int FontBody      = 18;
-        public const int FontCaption   = 14;
-        public const int FontSmall     = 12;
+        public const int FontCaption   = 15;
+        public const int FontSmall     = 13;
 
         // ── Spacing / Layout ─────────────────────────────────
         public const float PanelPad    = 32f;

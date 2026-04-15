@@ -651,6 +651,12 @@ namespace Deadlight.Systems
             int bonusPoints;
             int ammo;
             float heal;
+            int scrap;
+            int wood;
+            int chemicals;
+            int electronics;
+            int blueprintTokens;
+            bool craftingEnabled = GameManager.Instance != null && GameManager.Instance.CraftingEnabled;
 
             switch (tier)
             {
@@ -658,20 +664,43 @@ namespace Deadlight.Systems
                     bonusPoints = 220;
                     ammo = 90;
                     heal = 45f;
+                    scrap = 6;
+                    wood = 5;
+                    chemicals = 3;
+                    electronics = 2;
+                    blueprintTokens = 2;
                     break;
                 case CrateTier.Rare:
                     bonusPoints = 140;
                     ammo = 60;
                     heal = 30f;
+                    scrap = 4;
+                    wood = 3;
+                    chemicals = 2;
+                    electronics = 1;
+                    blueprintTokens = 1;
                     break;
                 default:
                     bonusPoints = 90;
                     ammo = 35;
                     heal = 18f;
+                    scrap = 2;
+                    wood = 1;
+                    chemicals = 1;
+                    electronics = 0;
+                    blueprintTokens = 0;
                     break;
             }
 
             PointsSystem.Instance?.AddPoints(bonusPoints, "Contested Drop");
+            if (craftingEnabled && ResourceManager.Instance != null)
+            {
+                if (scrap > 0) ResourceManager.Instance.AddResource(ResourceType.Scrap, scrap);
+                if (wood > 0) ResourceManager.Instance.AddResource(ResourceType.Wood, wood);
+                if (chemicals > 0) ResourceManager.Instance.AddResource(ResourceType.Chemicals, chemicals);
+                if (electronics > 0) ResourceManager.Instance.AddResource(ResourceType.Electronics, electronics);
+                if (blueprintTokens > 0) ResourceManager.Instance.AddResource(ResourceType.BlueprintToken, blueprintTokens);
+            }
 
             var playerObj = GameObject.Find("Player");
             var shooting = playerObj != null ? playerObj.GetComponent<PlayerShooting>() : null;
@@ -734,9 +763,18 @@ namespace Deadlight.Systems
                 help?.ShowItem(Deadlight.UI.GameplayGuideContent.ItemIds.Medkit, grantedMedkits);
             }
             help?.ShowItem(Deadlight.UI.GameplayGuideContent.ItemIds.Health, Mathf.RoundToInt(heal));
+            if (craftingEnabled && scrap > 0) help?.ShowItem(Deadlight.UI.GameplayGuideContent.ItemIds.Scrap, scrap);
+            if (craftingEnabled && wood > 0) help?.ShowItem(Deadlight.UI.GameplayGuideContent.ItemIds.Wood, wood);
+            if (craftingEnabled && chemicals > 0) help?.ShowItem(Deadlight.UI.GameplayGuideContent.ItemIds.Chemicals, chemicals);
+            if (craftingEnabled && electronics > 0) help?.ShowItem(Deadlight.UI.GameplayGuideContent.ItemIds.Electronics, electronics);
+            if (craftingEnabled && blueprintTokens > 0) help?.ShowItem(Deadlight.UI.GameplayGuideContent.ItemIds.BlueprintToken, blueprintTokens);
 
             var directSummary = new StringBuilder("DROP SECURED: ");
             directSummary.Append($"+{bonusPoints} Points, +{grantedAmmo} Ammo, +{Mathf.RoundToInt(heal)} HP");
+            if (craftingEnabled && (scrap > 0 || wood > 0 || chemicals > 0 || electronics > 0 || blueprintTokens > 0))
+            {
+                directSummary.Append($" | +{scrap} Scrap, +{wood} Wood, +{chemicals} Chemicals, +{electronics} Electronics, +{blueprintTokens} Token");
+            }
             if (grantedGrenades > 0 || grantedMolotovs > 0)
             {
                 if (grantedGrenades > 0)

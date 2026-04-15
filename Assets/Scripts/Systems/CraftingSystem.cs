@@ -334,8 +334,26 @@ namespace Deadlight.Systems
                 return;
             }
 
-            // Legacy crafting collectible hints are intentionally hidden from on-screen UI.
-            return;
+            if (!IsHintResource(type))
+            {
+                return;
+            }
+
+            float now = Time.time;
+            if (hintCooldowns.TryGetValue(type, out var cooldownUntil) && now < cooldownUntil)
+            {
+                return;
+            }
+
+            hintCooldowns[type] = now + 2.2f;
+
+            string hint = GetResourceHint(type);
+            string text = $"+{amount} {type}  ({hint})";
+
+            if (FloatingTextManager.Instance != null)
+            {
+                FloatingTextManager.Instance.SpawnText(text, worldPos + Vector3.up * 1.1f, new Color(0.7f, 0.95f, 1f), 1.4f, 16);
+            }
         }
 
         public void NotifyContestedDropSecured()

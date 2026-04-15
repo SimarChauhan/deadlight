@@ -21,7 +21,7 @@ namespace Deadlight.Core
 
     /// <summary>
     /// Manages the full game flow: Main Menu -> Day Phase -> Night Phase -> Dawn Phase -> repeat by campaign scope -> Victory or Game Over.
-    /// Works with GameManager, WaveSpawner, and DayNightCycle.
+    /// Works with GameManager, WaveManager, and DayNightCycle.
     /// </summary>
     public class GameFlowController : MonoBehaviour
     {
@@ -112,10 +112,6 @@ namespace Deadlight.Core
                 GameManager.Instance.OnNightChanged += HandleNightChanged;
             }
 
-            if (WaveSpawner.Instance != null)
-            {
-                WaveSpawner.Instance.OnAllWavesCleared += HandleAllWavesCleared;
-            }
         }
 
         private void Update()
@@ -135,11 +131,6 @@ namespace Deadlight.Core
             {
                 GameManager.Instance.OnGameStateChanged -= HandleGameStateChanged;
                 GameManager.Instance.OnNightChanged -= HandleNightChanged;
-            }
-
-            if (WaveSpawner.Instance != null)
-            {
-                WaveSpawner.Instance.OnAllWavesCleared -= HandleAllWavesCleared;
             }
         }
 
@@ -195,7 +186,13 @@ namespace Deadlight.Core
             SpawnTypeScattered(PickupType.Health, GetPickupCount(healthPickupsByNight, nightIdx), playerPos, usedPositions);
             int baseAmmoPickupCount = GetPickupCount(ammoPickupsByNight, nightIdx);
             SpawnTypeScattered(PickupType.Ammo, GetAdjustedAmmoPickupCount(baseAmmoPickupCount), playerPos, usedPositions);
-            // Legacy crafting pickups are retired for campaign; keep only combat-relevant drops.
+            if (GameManager.Instance != null && GameManager.Instance.CraftingEnabled)
+            {
+                SpawnTypeScattered(PickupType.Scrap, GetPickupCount(scrapPickupsByNight, nightIdx), playerPos, usedPositions);
+                SpawnTypeScattered(PickupType.Wood, GetPickupCount(woodPickupsByNight, nightIdx), playerPos, usedPositions);
+                SpawnTypeScattered(PickupType.Chemicals, GetPickupCount(chemicalsPickupsByNight, nightIdx), playerPos, usedPositions);
+                SpawnTypeScattered(PickupType.Electronics, GetPickupCount(electronicsPickupsByNight, nightIdx), playerPos, usedPositions);
+            }
         }
 
         private int GetPickupCount(int[] perNight, int nightIdx)
@@ -247,16 +244,11 @@ namespace Deadlight.Core
             for (int i = 0; i < count; i++)
             {
                 Vector3 pos = GetScatteredPosition(playerPos, usedPositions);
-                PickupSpawner.Instance.SpawnPickup(pos, type);
+                GameObject pickup = PickupSpawner.Instance.SpawnPickup(pos, type);
                 usedPositions.Add(pos);
-
-                // Track for cleanup — find the most recently created pickup of this type
-                var all = GameObject.FindObjectsByType<Deadlight.Systems.PickupItem>(FindObjectsSortMode.None);
-                if (all.Length > 0)
+                if (pickup != null && !spawnedPickups.Contains(pickup))
                 {
-                    var go = all[all.Length - 1].gameObject;
-                    if (!spawnedPickups.Contains(go))
-                        spawnedPickups.Add(go);
+                    spawnedPickups.Add(pickup);
                 }
             }
         }
@@ -408,8 +400,7 @@ namespace Deadlight.Core
                     OnStatusMessage?.Invoke($"Day Phase - Level {lvl}, Night {nwl}");
                     break;
                 case GameState.NightPhase:
-                    dayContestedDropState = DayContestedDropState.Inactive;
-                    dayContestedDropStateUntil = float.PositiveInfinity;
+                    ResetDayContestedDropState();
                     CleanupDayObjects();
                     dropsThisPhase = 0;
                     if (ShouldScheduleNightHelicopterDrop())
@@ -427,7 +418,7 @@ namespace Deadlight.Core
                     break;
                 case GameState.DawnPhase:
                     nextHelicopterDropTime = float.PositiveInfinity;
-                    dayContestedDropState = DayContestedDropState.Inactive;
+                    ResetDayContestedDropState();
                     OnDawnPhaseStarted?.Invoke();
                     if (GameManager.Instance != null && GameManager.Instance.WillRetryCurrentStepOnAdvance)
                     {
@@ -444,18 +435,18 @@ namespace Deadlight.Core
                     break;
                 case GameState.LevelComplete:
                     nextHelicopterDropTime = float.PositiveInfinity;
-                    dayContestedDropState = DayContestedDropState.Inactive;
+                    ResetDayContestedDropState();
                     CleanupDayObjects();
                     break;
                 case GameState.Victory:
                     nextHelicopterDropTime = float.PositiveInfinity;
-                    dayContestedDropState = DayContestedDropState.Inactive;
+                    ResetDayContestedDropState();
                     int clearedLevels = GameManager.Instance != null ? GameManager.Instance.PlayableLevelCap : 2;
                     OnStatusMessage?.Invoke($"Victory! Subject 23 contained. All {clearedLevels} playable levels cleared.");
                     break;
                 case GameState.GameOver:
                     nextHelicopterDropTime = float.PositiveInfinity;
-                    dayContestedDropState = DayContestedDropState.Inactive;
+                    ResetDayContestedDropState();
                     OnStatusMessage?.Invoke("Game Over");
                     break;
             }
@@ -494,12 +485,6 @@ namespace Deadlight.Core
             {
                 RunModifierSystem.Instance.RollNightEvent(night, Time.frameCount + night * 67);
             }
-        }
-
-        private void HandleAllWavesCleared()
-        {
-            // WaveSpawner already calls GameManager.OnNightSurvived() - state will transition to DawnPhase or Victory
-            // This listener allows GameFlowController to react; OnDawnPhaseStarted is raised via HandleGameStateChanged
         }
 
         private void ResetDayContestedDropState()
