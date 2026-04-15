@@ -79,38 +79,69 @@ namespace Deadlight.Systems
 
         private void InitializeDefaultMilestones()
         {
-            if (nightMilestones.Count > 0) return;
-
-            nightMilestones = new List<NightMilestone>
+            if (nightMilestones == null)
             {
-                new NightMilestone
+                nightMilestones = new List<NightMilestone>();
+            }
+
+            for (int night = 1; night <= 12; night++)
+            {
+                if (nightMilestones.Exists(m => m != null && m.night == night))
                 {
-                    night = 1,
-                    description = "Clear Level 1 - Shotgun and barricades unlocked",
-                    bonusPoints = 100,
-                    isCompleted = false
-                },
-                new NightMilestone
-                {
-                    night = 2,
-                    description = "Clear Level 2 - Automatic rifle and traps unlocked",
-                    bonusPoints = 150,
-                    isCompleted = false
-                },
-                new NightMilestone
-                {
-                    night = 3,
-                    description = "Clear Level 3 - Grenade launcher unlocked",
-                    bonusPoints = 200,
-                    isCompleted = false
-                },
-                new NightMilestone
-                {
-                    night = 4,
-                    description = "Clear Level 4 - Final stand complete",
-                    bonusPoints = 500,
-                    isCompleted = false
+                    continue;
                 }
+
+                nightMilestones.Add(CreateDefaultMilestone(night));
+            }
+
+            nightMilestones.Sort((left, right) =>
+            {
+                if (left == null && right == null)
+                {
+                    return 0;
+                }
+
+                if (left == null)
+                {
+                    return 1;
+                }
+
+                if (right == null)
+                {
+                    return -1;
+                }
+
+                return left.night.CompareTo(right.night);
+            });
+        }
+
+        private static NightMilestone CreateDefaultMilestone(int night)
+        {
+            string[] milestoneSuffixes =
+            {
+                "First Dawn supply stipend",
+                "Escalation supply stipend",
+                "Extraction bonus awarded",
+                "Perimeter cache secured",
+                "Relay cache recovered",
+                "Safehouse cache secured",
+                "Quarantine breach contained",
+                "Deep district cache secured",
+                "Containment pressure survived",
+                "Siege endurance bonus",
+                "Final approach bonus",
+                "Final extraction bonus"
+            };
+
+            int index = Mathf.Clamp(night - 1, 0, milestoneSuffixes.Length - 1);
+            int bonusPoints = 100 + ((night - 1) * 25);
+
+            return new NightMilestone
+            {
+                night = night,
+                description = $"Night {night} cleared - {milestoneSuffixes[index]}",
+                bonusPoints = bonusPoints,
+                isCompleted = false
             };
         }
 
@@ -133,8 +164,9 @@ namespace Deadlight.Systems
             }
             else if (newState == GameState.Victory)
             {
-                CompleteMilestone(4);
-                highestNightReached = 4;
+                int finalNight = GameManager.Instance != null ? GameManager.Instance.CurrentNight : highestNightReached;
+                CompleteMilestone(finalNight);
+                highestNightReached = Mathf.Max(highestNightReached, finalNight);
             }
         }
 
@@ -161,7 +193,7 @@ namespace Deadlight.Systems
                 var pointsSystem = PointsSystem.Instance;
                 if (pointsSystem != null && milestone.bonusPoints > 0)
                 {
-                    pointsSystem.AddPoints(milestone.bonusPoints, $"Level {night} Milestone");
+                    pointsSystem.AddPoints(milestone.bonusPoints, $"Night {night} Milestone");
                 }
 
                 OnMilestoneCompleted?.Invoke(milestone);
@@ -188,6 +220,19 @@ namespace Deadlight.Systems
             {
                 Debug.Log("[ProgressionManager] Weapon already purchased");
                 return false;
+            }
+
+            if (unlock.pointCost < 0)
+            {
+                Debug.LogWarning($"[ProgressionManager] Invalid negative point cost for {weapon.weaponName}: {unlock.pointCost}");
+                return false;
+            }
+
+            if (unlock.pointCost == 0)
+            {
+                unlock.isPurchased = true;
+                Debug.Log($"[ProgressionManager] Purchased weapon for free: {weapon.weaponName}");
+                return true;
             }
 
             var pointsSystem = PointsSystem.Instance;
@@ -261,11 +306,18 @@ namespace Deadlight.Systems
 
         public void AddWeaponUnlock(WeaponData weapon, int nightRequired, int pointCost)
         {
+            int sanitizedNightRequired = Mathf.Max(1, nightRequired);
+            int sanitizedPointCost = Mathf.Max(0, pointCost);
+            if (pointCost < 0)
+            {
+                Debug.LogWarning($"[ProgressionManager] Clamped negative weapon point cost for {weapon?.weaponName ?? "Unknown"} from {pointCost} to 0.");
+            }
+
             weaponUnlocks.Add(new WeaponUnlock
             {
                 weapon = weapon,
-                nightRequired = nightRequired,
-                pointCost = pointCost,
+                nightRequired = sanitizedNightRequired,
+                pointCost = sanitizedPointCost,
                 isUnlocked = false,
                 isPurchased = false
             });

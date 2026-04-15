@@ -38,6 +38,10 @@ namespace Deadlight.UI
             public const string Powerup = "powerup";
             public const string BlueprintToken = "blueprint_token";
             public const string Armor = "armor";
+            public const string Grenade = "grenade";
+            public const string Molotov = "molotov";
+            public const string Shotgun = "shotgun";
+            public const string Medkit = "medkit";
             public const string LoreIntel = "lore_intel";
         }
 
@@ -53,46 +57,41 @@ namespace Deadlight.UI
                 "Ammo",
                 "Adds reserve ammunition for your weapons. Reload with R when the magazine runs dry.",
                 "Adds reserve ammo."),
-            [ItemIds.Scrap] = new GameplayHelpEntry(
-                ItemIds.Scrap,
-                "Scrap",
-                "Common salvage used in daytime crafting, especially Ammo Cache and Weakpoint Intel prep.",
-                "Core crafting salvage."),
-            [ItemIds.Wood] = new GameplayHelpEntry(
-                ItemIds.Wood,
-                "Wood",
-                "Support material used for early prep and fortification-style crafting during the day.",
-                "Basic support material."),
-            [ItemIds.Chemicals] = new GameplayHelpEntry(
-                ItemIds.Chemicals,
-                "Chemicals",
-                "Needed for Field Med and Shock Beacon crafting recipes before nightfall.",
-                "Medical and tech crafting."),
-            [ItemIds.Electronics] = new GameplayHelpEntry(
-                ItemIds.Electronics,
-                "Electronics",
-                "Advanced parts used in higher-tier recipes like Shock Beacon and Weakpoint Intel.",
-                "Advanced crafting part."),
             [ItemIds.Points] = new GameplayHelpEntry(
                 ItemIds.Points,
                 "Points",
-                "Spend these at dawn on weapons, armor, and permanent upgrades for later levels.",
+                "Spend these at dawn on weapons, armor, utility refills, and run upgrades.",
                 "Spend at dawn shop."),
             [ItemIds.Powerup] = new GameplayHelpEntry(
                 ItemIds.Powerup,
                 "Powerup",
                 "Activates a random temporary combat bonus such as Double Damage, Speed Boost, Infinite Ammo, or Invincibility.",
                 "Random temporary buff."),
-            [ItemIds.BlueprintToken] = new GameplayHelpEntry(
-                ItemIds.BlueprintToken,
-                "Blueprint Token",
-                "Unlocks advanced daytime recipes that improve your odds in the next level.",
-                "Needed for advanced crafting."),
             [ItemIds.Armor] = new GameplayHelpEntry(
                 ItemIds.Armor,
                 "Armor",
                 "Vests and helmets absorb incoming damage before your health does.",
                 "Absorbs incoming damage."),
+            [ItemIds.Grenade] = new GameplayHelpEntry(
+                ItemIds.Grenade,
+                "Grenade",
+                "Explosive utility. Throw with Q to clear clustered enemies.",
+                "Explosive utility."),
+            [ItemIds.Molotov] = new GameplayHelpEntry(
+                ItemIds.Molotov,
+                "Molotov",
+                "Incendiary utility. Throw with G to deny space and burn enemies over time.",
+                "Area burn utility."),
+            [ItemIds.Shotgun] = new GameplayHelpEntry(
+                ItemIds.Shotgun,
+                "Shotgun",
+                "Close-range powerhouse added to your loadout when a slot is free.",
+                "New weapon acquired."),
+            [ItemIds.Medkit] = new GameplayHelpEntry(
+                ItemIds.Medkit,
+                "Medkit",
+                "Stored healing charge. Use with C to channel and recover a large chunk of health.",
+                "Stored emergency heal."),
             [ItemIds.LoreIntel] = new GameplayHelpEntry(
                 ItemIds.LoreIntel,
                 "Intel Document",
@@ -106,10 +105,10 @@ namespace Deadlight.UI
             {
                 PickupType.Health => ItemIds.Health,
                 PickupType.Ammo => ItemIds.Ammo,
-                PickupType.Scrap => ItemIds.Points,
-                PickupType.Wood => ItemIds.Points,
-                PickupType.Chemicals => ItemIds.Points,
-                PickupType.Electronics => ItemIds.Points,
+                PickupType.Scrap => string.Empty,
+                PickupType.Wood => string.Empty,
+                PickupType.Chemicals => string.Empty,
+                PickupType.Electronics => string.Empty,
                 PickupType.Points => ItemIds.Points,
                 PickupType.Powerup => ItemIds.Powerup,
                 _ => string.Empty
@@ -123,52 +122,84 @@ namespace Deadlight.UI
 
         public static string GetControlsText()
         {
-            return "WASD  Move\n" +
-                   "Mouse  Aim\n" +
-                   "Left Click  Fire\n" +
-                   "R  Reload\n" +
-                   "1 / 2 / Wheel  Swap weapon\n" +
-                   "Left Shift  Sprint\n" +
-                   "Space  Dodge\n" +
-                   "Q  Throw grenade\n" +
-                   "G  Throw molotov\n" +
-                   "C  Use stored medkit (2.5s apply)\n" +
-                   "F  Interact\n" +
-                   "J  Open journal\n" +
-                   "[ and ]  Cycle journal pages\n" +
-                   "H or F1  Open guide\n" +
-                   "Esc  Pause";
+            return "<b>Movement + Combat</b>\n" +
+                   "WASD Move\n" +
+                   "Mouse Aim\n" +
+                   "Left Click Fire\n" +
+                   "R Reload\n" +
+                   "1 / 2 / 3 / 4 / Wheel Swap weapon\n" +
+                   "Left Shift Sprint (speed boost)\n" +
+                   "Space Dodge roll (quick acceleration burst, 0.8s cooldown)\n\n" +
+                   "<b>Utility</b>\n" +
+                   "Q Throw grenade\n" +
+                   "G Throw molotov\n" +
+                   "C Use stored medkit (2.5s channel)\n" +
+                   "F Tap to interact / secure day objectives\n" +
+                   "F Hold (1.5s) to loot supply crates\n\n" +
+                   "<b>Interface</b>\n" +
+                   "J Open journal\n" +
+                   "[ and ] Cycle journal pages\n" +
+                   "H or F1 Open guide\n" +
+                   "Esc Pause";
         }
 
         public static string GetRulesText()
         {
-            return "Daytime is for scavenging, story leads, and prep. Collect supplies, recover lore, and secure contested drops before sunset.\n\n" +
-                   "Nighttime is pure survival. Hold out through the waves until dawn while using the resources and upgrades you prepared earlier.\n\n" +
-                   "At dawn, spend points on weapons, armor, and upgrades. Smart purchases make later levels manageable.";
+            return "<b>Campaign Scope</b>\n" +
+                   "- Four playable levels.\n" +
+                   "- Route: Town Center -> Suburban -> Industrial -> Research.\n" +
+                   "- Each sector unlocks after the previous one is cleared.\n\n" +
+                   "<b>Core Loop</b>\n" +
+                   "- Each level has 3 day/night steps.\n" +
+                   "- Day: complete objective + loot.\n" +
+                   "- Night: survive all waves until dawn.\n" +
+                   "- Dawn: shop, refill, upgrade, redeploy.\n\n" +
+                   "<b>Run End</b>\n" +
+                   "- Win by clearing the final Research deployment.\n" +
+                   "- Player death ends the run.";
         }
 
         public static string GetSystemsText()
         {
-            return "Contested Drops: High-value crates during the day that pay out bundled combat supplies and points if you secure them.\n\n" +
-                   "Journal: Press J to review recovered lore and the current story arc so players can reconnect mechanics with the world.";
+            return "<b>Prototype Coverage</b>\n" +
+                   "- Level Design: district-specific routes, landmarks, chokepoints, and objective lanes across all four maps.\n" +
+                   "- Player Guidance: intro briefing, objective tracker, guide, and pickup callouts.\n" +
+                   "- System Balance: pressure escalates from Level 1, Night 1 through the final Research sector.\n" +
+                   "- Progression: dawn upgrades and weapon access progress through the run.\n" +
+                   "- Rewards: kills, objective clears, and crates grant spendable points.\n\n" +
+                   "<b>Objective Miss Rule</b>\n" +
+                   "- Miss once: 1 retry on the same step.\n" +
+                   "- Miss twice: forced advance.\n\n" +
+                   "<b>Penalty Rule</b>\n" +
+                   "- Next-night enemies are stronger.\n" +
+                   "- Next-level point carryover is reduced.\n\n" +
+                   "<b>Economy + Progression</b>\n" +
+                   "- Upgrades persist during the run.\n" +
+                   "- Points partially carry between levels.\n\n" +
+                   "<b>Events + Story</b>\n" +
+                   "- Contested drops give bonus supplies if secured.\n" +
+                   "- Journal (J) tracks lore and objective context.";
         }
 
         public static string GetItemsText()
         {
             var builder = new StringBuilder();
-            builder.AppendLine("Health Packs: restore lost HP.");
-            builder.AppendLine("Medkits: buy at dawn, store up to capacity, press C to apply over time.");
-            builder.AppendLine("Ammo: refills reserve ammo.");
-            builder.AppendLine("Points: currency for the dawn shop and upgrades.");
-            builder.AppendLine("Powerups: temporary combat boosts.");
-            builder.AppendLine("Armor: helmets and vests soak damage before health.");
-            builder.Append("Intel Documents: collectible lore entries added to the journal.");
+            builder.AppendLine("<b>Pickups + Utility</b>");
+            builder.AppendLine("- Health: instant heal on pickup.");
+            builder.AppendLine("- Ammo: adds reserve ammo.");
+            builder.AppendLine("- Grenade / Molotov: throw with Q/G, refill at dawn.");
+            builder.AppendLine("- Level 4 drops can include grenade, molotov, medkit, and shotgun rewards.");
+            builder.AppendLine("- Medkit: buy/store (max 5), use with C (2.5s).");
+            builder.AppendLine("- Points: shop currency.");
+            builder.AppendLine("- Powerup: temporary combat buff.");
+            builder.AppendLine("- Armor: vest/helmet absorb damage first.");
+            builder.AppendLine("- Intel Documents: journal lore pickups.");
             return builder.ToString();
         }
 
         public static string GetAccessibilityNote()
         {
-            return "First-time discoveries show fuller guidance; repeat pickups stay compact so the HUD remains readable.";
+            return "Pickup callouts show what you gained, and the HUD utility panel tracks grenade/molotov/medkit counts plus active molotov fire time.";
         }
     }
 
@@ -255,6 +286,11 @@ namespace Deadlight.UI
 
         public void ShowItem(string itemId, int amount = 0)
         {
+            if (IsLegacyCollectibleItem(itemId))
+            {
+                return;
+            }
+
             if (!GameplayGuideContent.TryGetEntry(itemId, out _))
             {
                 return;
@@ -275,6 +311,15 @@ namespace Deadlight.UI
             {
                 displayRoutine = StartCoroutine(ProcessQueue());
             }
+        }
+
+        private static bool IsLegacyCollectibleItem(string itemId)
+        {
+            return itemId == GameplayGuideContent.ItemIds.Scrap ||
+                   itemId == GameplayGuideContent.ItemIds.Wood ||
+                   itemId == GameplayGuideContent.ItemIds.Chemicals ||
+                   itemId == GameplayGuideContent.ItemIds.Electronics ||
+                   itemId == GameplayGuideContent.ItemIds.BlueprintToken;
         }
 
         private void HandleGameStateChanged(GameState newState)

@@ -1537,6 +1537,13 @@ namespace Deadlight.Visuals
 
         public static void ClearCache()
         {
+            foreach (var kvp in spriteCache)
+            {
+                if (kvp.Value != null && kvp.Value.texture != null)
+                {
+                    Object.Destroy(kvp.Value.texture);
+                }
+            }
             spriteCache.Clear();
         }
 

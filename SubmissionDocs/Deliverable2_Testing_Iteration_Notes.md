@@ -18,11 +18,23 @@ The weaker points were:
 
 Based on that feedback, the current branch emphasizes clearer story signaling:
 
-- stronger radio communication across the five-night structure,
+- stronger radio communication across the current two-level / six-night structure,
 - more direct phase messaging during day and night transitions,
 - optional lore entries that name actors and explain consequences,
 - day objectives and contested events that feel like in-world tactical activity rather than abstract tasks,
 - narrative hooks that connect preparation, danger, and escalation.
+
+## Latest Implementation Update (Onboarding and Message Clarity)
+
+The newest iteration in this branch focused on first-session onboarding quality:
+
+- Day 1 guidance is staged in sequence (objective first, then drop guidance).
+- The first drop instruction asks the player to follow the marker; hold-to-loot appears only near the crate.
+- Night 1 aim/fire guidance is tied to first visible hostiles instead of stacked startup prompts.
+- Night 1 pressure in Level 1 is intentionally moderated (slower speed and one-by-one pacing) so players can learn controls.
+- COMMS queue handling was updated to reduce cases where one message cuts off another too early.
+
+These updates were made to keep early gameplay readable while preserving the core day-night survival loop.
 
 ## Runtime Validation Used for Dev2
 

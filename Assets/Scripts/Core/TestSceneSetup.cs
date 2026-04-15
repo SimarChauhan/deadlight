@@ -375,7 +375,7 @@ namespace Deadlight.Core
                 rmObj.transform.SetParent(managersParent);
                 rmObj.AddComponent<Systems.ResourceManager>();
 
-                bool craftingEnabled = GameManager.Instance == null || GameManager.Instance.CraftingEnabled;
+                bool craftingEnabled = GameManager.Instance != null && GameManager.Instance.CraftingEnabled;
                 if (craftingEnabled)
                 {
                     var csObj = new GameObject("CraftingSystem");
@@ -1105,24 +1105,60 @@ namespace Deadlight.Core
                 new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-14f, 10f), new Vector2(170f, 48f));
             ammoText.GetComponent<Text>().fontStyle = FontStyle.Bold;
 
+            // Weapon slot strip (sits above the weapon panel, shows slots 1-4 with key hints)
+            var slotBar = CreateUIPanel(hudRoot.transform, "WeaponSlotBar",
+                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
+                new Vector2(-24f, 186f), new Vector2(360f, 36f));
+            slotBar.AddComponent<Image>().color = new Color(0.04f, 0.04f, 0.06f, 0.72f);
+
+            var slotBgs   = new Image[4];
+            var slotNames = new Text[4];
+            float slotW = 84f, slotH = 28f, slotGap = 4f;
+
+            for (int si = 0; si < 4; si++)
+            {
+                float xOff = 4f + si * (slotW + slotGap);
+                var slotRoot = CreateUIPanel(slotBar.transform, $"Slot{si + 1}",
+                    new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(0f, 1f),
+                    new Vector2(xOff, -4f), new Vector2(slotW, slotH));
+                var slotImg = slotRoot.AddComponent<Image>();
+                slotImg.color = new Color(0.10f, 0.10f, 0.13f, 0.85f);
+                slotBgs[si] = slotImg;
+
+                // Key number
+                var keyGo = CreateUIText(slotRoot.transform, "Key",
+                    new Vector2(0f, 0.5f), $"{si + 1}", font, 11,
+                    TextAnchor.MiddleLeft, new Color(0.65f, 0.65f, 0.70f, 1f),
+                    new Vector2(0f, 0f), new Vector2(0f, 1f), new Vector2(5f, 0f), new Vector2(14f, 0f));
+                keyGo.GetComponent<Text>().fontStyle = FontStyle.Bold;
+
+                // Weapon name
+                var nameGo = CreateUIText(slotRoot.transform, "SlotName",
+                    new Vector2(0f, 0.5f), si == 0 ? "PISTOL" : "───", font, 11,
+                    TextAnchor.MiddleLeft, new Color(0.95f, 0.95f, 0.90f, 1f),
+                    new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(19f, 0f), new Vector2(-5f, 0f));
+                nameGo.GetComponent<Text>().fontStyle = FontStyle.Bold;
+                slotNames[si] = nameGo.GetComponent<Text>();
+            }
+
             // Radio transmission panel
             var radioPanel = CreateUIPanel(hudRoot.transform, "RadioPanel",
-                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(1f, 0f),
-                new Vector2(-24f, 164f), new Vector2(500f, 100f));
+                new Vector2(0.5f, 0f), new Vector2(0.5f, 0f), new Vector2(0.5f, 0f),
+                new Vector2(0f, 84f), new Vector2(740f, 108f));
             var radioBg = radioPanel.AddComponent<Image>();
-            radioBg.color = cardSoft;
+            radioBg.color = new Color(cardSoft.r, cardSoft.g, cardSoft.b, 0.45f);
 
             var radioLabel = CreateUIText(radioPanel.transform, "RadioLabel",
                 new Vector2(0f, 1f), "COMMS", font, 14, TextAnchor.UpperLeft,
                 accentGold,
-                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(14f, -6f), new Vector2(120f, 18f));
+                new Vector2(0f, 1f), new Vector2(0f, 1f), new Vector2(14f, -10f), new Vector2(120f, 18f));
             radioLabel.GetComponent<Text>().fontStyle = FontStyle.Bold;
 
             var radioText = CreateUIText(radioPanel.transform, "RadioText",
-                new Vector2(0f, 0.5f), "", font, 20, TextAnchor.MiddleLeft, new Color(0.95f, 0.95f, 0.9f),
+                new Vector2(0f, 0.5f), "", font, 20, TextAnchor.MiddleLeft, new Color(0.95f, 0.95f, 0.90f),
                 new Vector2(0f, 0f), new Vector2(1f, 1f), new Vector2(0f, 0f), new Vector2(0f, 0f));
             radioText.GetComponent<RectTransform>().offsetMin = new Vector2(16f, 16f);
-            radioText.GetComponent<RectTransform>().offsetMax = new Vector2(-16f, -24f);
+            radioText.GetComponent<RectTransform>().offsetMax = new Vector2(-16f, -36f);
             radioText.GetComponent<Text>().fontStyle = FontStyle.Normal;
             radioText.GetComponent<Text>().horizontalOverflow = HorizontalWrapMode.Wrap;
             radioText.GetComponent<Text>().verticalOverflow = VerticalWrapMode.Overflow;
@@ -1161,7 +1197,7 @@ namespace Deadlight.Core
             // Objective HUD
             var objPanel = CreateUIPanel(hudRoot.transform, "ObjectivePanel",
                 new Vector2(0, 1), new Vector2(0, 1), new Vector2(0, 1),
-                new Vector2(24f, -154f), new Vector2(440f, 112f));
+                new Vector2(24f, -154f), new Vector2(440f, 122f));
             var objPanelBg = objPanel.AddComponent<Image>();
             objPanelBg.color = cardSoft;
             objPanel.SetActive(false);
@@ -1177,16 +1213,23 @@ namespace Deadlight.Core
                 titleColor,
                 new Vector2(0f, 0f), new Vector2(1f, 1f), Vector2.zero, Vector2.zero);
             var objDescRect = objDescText.GetComponent<RectTransform>();
-            objDescRect.offsetMin = new Vector2(14f, 36f);
+            objDescRect.offsetMin = new Vector2(14f, 42f);
             objDescRect.offsetMax = new Vector2(-14f, -38f);
-            objDescText.GetComponent<Text>().fontStyle = FontStyle.Bold;
-            objDescText.GetComponent<Text>().horizontalOverflow = HorizontalWrapMode.Wrap;
-            objDescText.GetComponent<Text>().verticalOverflow = VerticalWrapMode.Overflow;
+            var objDescTextComponent = objDescText.GetComponent<Text>();
+            objDescTextComponent.fontStyle = FontStyle.Bold;
+            objDescTextComponent.horizontalOverflow = HorizontalWrapMode.Wrap;
+            objDescTextComponent.verticalOverflow = VerticalWrapMode.Truncate;
 
             var objProgressText = CreateUIText(objPanel.transform, "ObjProgress",
-                new Vector2(1f, 0f), "", font, 17, TextAnchor.LowerRight,
+                new Vector2(0f, 0f), "", font, 15, TextAnchor.LowerLeft,
                 accentGreen,
-                new Vector2(1f, 0f), new Vector2(1f, 0f), new Vector2(-14f, 10f), new Vector2(180f, 24f));
+                new Vector2(0f, 0f), new Vector2(1f, 0f), Vector2.zero, Vector2.zero);
+            var objProgressRect = objProgressText.GetComponent<RectTransform>();
+            objProgressRect.offsetMin = new Vector2(14f, 8f);
+            objProgressRect.offsetMax = new Vector2(-14f, 34f);
+            var objProgressTextComponent = objProgressText.GetComponent<Text>();
+            objProgressTextComponent.horizontalOverflow = HorizontalWrapMode.Wrap;
+            objProgressTextComponent.verticalOverflow = VerticalWrapMode.Truncate;
 
             canvas.gameObject.AddComponent<Deadlight.UI.ObjectiveMarker>();
 
@@ -1214,6 +1257,7 @@ namespace Deadlight.Core
                 throwablesText.GetComponent<Text>()
             );
             hudComp.SetWeaponHUD(weaponIconImage, weaponName.GetComponent<Text>(), weaponStats.GetComponent<Text>());
+            hudComp.SetWeaponSlotStrip(slotBgs, slotNames);
             hudComp.SetArmorHUD(vestFillImage, helmFillImage,
                 vestLabelObj.GetComponent<Text>(), helmLabelObj.GetComponent<Text>(), armorPanelObj);
 

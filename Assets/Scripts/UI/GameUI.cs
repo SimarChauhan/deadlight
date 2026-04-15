@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using Deadlight.Core;
@@ -51,11 +52,16 @@ namespace Deadlight.UI
         private readonly HashSet<WeaponType> _purchasedWeapons = new HashSet<WeaponType>();
         private readonly List<Text> _upgradeLabels = new List<Text>();
         private readonly List<Button> _upgradeBuyButtons = new List<Button>();
-        private const int SupplyButtonCount = 4;
+        private readonly List<AmmoPurchaseRowBinding> _ammoPurchaseRows = new List<AmmoPurchaseRowBinding>();
+        private PointsSystem _observedPointsSystem;
+        private PlayerShooting _observedPlayerShooting;
+        private const int SupplyButtonCount = 3;
+        private const int AmmoSlotCount = 4;
         private const int HealCost = 50;
         private const int AmmoRefillCost = 30;
         private const int GrenadeRefillCost = 35;
         private const int MolotovRefillCost = 45;
+        private const int AmmoPurchaseAmount = 60;
 
         // ── Campaign state ────────────────────────────────────
         private Text _mainMenuProgressText;
@@ -63,16 +69,16 @@ namespace Deadlight.UI
         private Text _levelCompleteStatsText;
         private readonly List<CampaignRouteRowBinding> _campaignRouteRows = new List<CampaignRouteRowBinding>();
         private readonly List<CampaignCardBinding> _campaignCards = new List<CampaignCardBinding>();
+        private readonly List<LeaderboardRowBinding> _leaderboardRows = new List<LeaderboardRowBinding>();
 
         private bool _waitingForEnding;
         private bool _resumeGameplayOnGuideClose;
 
         // ── Campaign data ─────────────────────────────────────
         private static readonly string[] levelSubtitles = { "Crash Evidence", "Shelter Records", "Lazarus Breach", "Containment Finale" };
-        private static readonly string[] levelMapNames = { "Town Center", "Suburban Evacuation", "Industrial District", "Research Facility" };
+        private static readonly string[] levelMapNames = { "Town Center", "Suburban Outskirts", "Industrial District", "Research Complex" };
         private static readonly string[] levelStageLabels = { "3 objective nights", "3 objective nights", "3 objective nights", "3 nights + boss finale" };
         private static readonly string[] levelPreviewKeys = { "TownCenter", "Suburban", "Industrial", "Research" };
-        private const int MaxSelectableLevel = 2;
         private static readonly string[] levelObjectiveSummaries = {
             "Recover Flight 7's black box.",
             "Recover the shelter evacuation records.",
@@ -105,6 +111,26 @@ namespace Deadlight.UI
             public Color FallbackColor;
         }
 
+        private sealed class AmmoPurchaseRowBinding
+        {
+            public int Slot;
+            public GameObject Root;
+            public Text TitleText;
+            public Text StatusText;
+            public Button BuyButton;
+            public Text ButtonLabel;
+        }
+
+        private sealed class LeaderboardRowBinding
+        {
+            public Image Background;
+            public Text RankText;
+            public Text ScoreText;
+            public Text NightsText;
+            public Text KillsText;
+            public Text MapText;
+        }
+
         public bool IsGuideOpen => _guidePanel != null && _guidePanel.activeSelf;
 
         // =====================================================================
@@ -131,6 +157,8 @@ namespace Deadlight.UI
                 GameManager.Instance.OnPauseChanged += OnPauseChanged;
             }
 
+            HookPointsSystemEvents();
+
             RefreshForCurrentState();
         }
 
@@ -141,6 +169,9 @@ namespace Deadlight.UI
                 GameManager.Instance.OnGameStateChanged -= OnGameStateChanged;
                 GameManager.Instance.OnPauseChanged -= OnPauseChanged;
             }
+
+            UnhookPointsSystemEvents();
+            UnhookPlayerShootingEvents();
         }
 
         private void Update()
@@ -176,6 +207,8 @@ namespace Deadlight.UI
 
         public void RefreshForCurrentState()
         {
+            HookPointsSystemEvents();
+
             if (_mainMenuPanel == null)
             {
                 return;
@@ -229,6 +262,7 @@ namespace Deadlight.UI
                 if (cg == null) cg = p.AddComponent<CanvasGroup>();
                 cg.alpha = 0f;
             }
+            UnhookPlayerShootingEvents();
             _resumeGameplayOnGuideClose = false;
         }
 
@@ -243,6 +277,7 @@ namespace Deadlight.UI
             HidePanel(_gameOverPanel);
             HidePanel(_victoryPanel);
             HidePanel(_leaderboardPanel);
+            UnhookPlayerShootingEvents();
             _resumeGameplayOnGuideClose = false;
         }
 
@@ -292,12 +327,12 @@ namespace Deadlight.UI
             UIFactory.CreateTextAt(left.transform, "Subtitle", "Survival After Dark",
                 UITheme.FontHeading, UITheme.WithAlpha(UITheme.TextPrimary, 0.85f),
                 new Vector2(0f, 1f), new Vector2(26f, -96f), new Vector2(400f, 32f),
-                TextAnchor.UpperLeft);
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             UIFactory.CreateTextAt(left.transform, "Body",
-                "Fight through four campaign levels. Each carries three daylight objective pushes before nightfall. Level 4 ends with the Subject 23 boss fight.",
+                "Four playable districts, twelve objective nights, and a final containment push now make up the full campaign route.",
                 UITheme.FontBody, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(26f, -148f), new Vector2(480f, 80f),
+                new Vector2(0f, 1f), new Vector2(26f, -148f), new Vector2(490f, 92f),
                 TextAnchor.UpperLeft);
 
             UIFactory.CreateTextAt(left.transform, "ProgressLabel", "NEXT DEPLOYMENT",
@@ -311,20 +346,20 @@ namespace Deadlight.UI
                 TextAnchor.UpperLeft, FontStyle.Bold);
 
             // Action buttons
-            UIFactory.CreateActionButton(left.transform, "StartBtn", "Continue Campaign",
-                "Deploy from the highest unlocked level.",
+            UIFactory.CreateActionButton(left.transform, "StartBtn", "Select Level",
+                "Choose your unlocked level and deploy manually.",
                 UITheme.AccentGreen, new Vector2(0f, 1f), new Vector2(24f, -344f),
-                new Vector2(500f, 86f), StartCampaign);
+                new Vector2(500f, 92f), ShowCampaignMap);
 
             UIFactory.CreateActionButton(left.transform, "MapBtn", "Level Select",
-                "Review unlocked levels and the final boss push.",
+                "Deploy to any unlocked level and preview the full route.",
                 UITheme.AccentGold, new Vector2(0f, 1f), new Vector2(24f, -442f),
-                new Vector2(500f, 86f), ShowCampaignMap);
+                new Vector2(500f, 92f), ShowCampaignMap);
 
             UIFactory.CreateActionButton(left.transform, "GuideBtn", "Guide",
                 "Controls, systems, and survival tips.",
                 UITheme.AccentBlue, new Vector2(0f, 1f), new Vector2(24f, -540f),
-                new Vector2(500f, 86f), OpenGuideFromButton);
+                new Vector2(500f, 92f), OpenGuideFromButton);
 
             UIFactory.CreateCompactButton(left.transform, "LeaderboardBtn", "Leaderboard",
                 UITheme.Darken(UITheme.AccentBlue, 0.2f),
@@ -347,10 +382,10 @@ namespace Deadlight.UI
                 TextAnchor.UpperLeft, FontStyle.Bold);
 
             UIFactory.CreateTextAt(right.transform, "RouteDesc",
-                "Each level contains three daylight objectives before each night. Level 4 ends with the Subject 23 boss fight.",
-                UITheme.FontBody, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(24f, -72f), new Vector2(900f, 48f),
-                TextAnchor.UpperLeft);
+                "Campaign route spans four playable levels with escalating objectives and a final boss sector.",
+                UITheme.FontCaption, UITheme.TextSecondary,
+                new Vector2(0f, 1f), new Vector2(24f, -72f), new Vector2(900f, 52f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             _campaignRouteRows.Clear();
             float rowY = -148f;
@@ -366,7 +401,7 @@ namespace Deadlight.UI
             Color accent, Vector2 pos)
         {
             var row = UIFactory.CreateCard(parent, $"RouteRow_{level}",
-                new Vector2(0f, 1f), new Vector2(980f, 130f), UITheme.BgMedium);
+                new Vector2(0f, 1f), new Vector2(980f, 136f), UITheme.BgMedium);
             var rowRt = row.GetComponent<RectTransform>();
             rowRt.pivot = new Vector2(0f, 1f);
             rowRt.anchoredPosition = pos;
@@ -397,12 +432,12 @@ namespace Deadlight.UI
 
             UIFactory.CreateTextAt(row.transform, "Teaser", teaser,
                 UITheme.FontCaption, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(textX, -76f), new Vector2(600f, 42f),
-                TextAnchor.UpperLeft);
+                new Vector2(0f, 1f), new Vector2(textX, -78f), new Vector2(650f, 48f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             // Status badge
             var badge = UIFactory.CreateCard(row.transform, "StatusBadge",
-                new Vector2(1f, 0.5f), new Vector2(110f, 32f), UITheme.BgLight);
+                new Vector2(1f, 0.5f), new Vector2(126f, 36f), UITheme.BgLight);
             badge.GetComponent<RectTransform>().anchoredPosition = new Vector2(-16f, 0f);
             badge.GetComponent<RectTransform>().pivot = new Vector2(1f, 0.5f);
 
@@ -436,10 +471,10 @@ namespace Deadlight.UI
                 TextAnchor.UpperLeft, FontStyle.Bold);
 
             UIFactory.CreateTextAt(_mapSelectPanel.transform, "Desc",
-                "Choose any unlocked level. Each contains three daylight objectives, and Level 4 ends with the Subject 23 boss fight.",
+                "Select any unlocked level. Clear the active sector to unlock the next deployment.",
                 UITheme.FontBody, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(54f, -158f), new Vector2(720f, 48f),
-                TextAnchor.UpperLeft);
+                new Vector2(0f, 1f), new Vector2(54f, -158f), new Vector2(760f, 52f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             _mapSelectProgressText = UIFactory.CreateTextAt(_mapSelectPanel.transform, "Progress", "",
                 UITheme.FontBody, UITheme.AccentGold,
@@ -505,12 +540,12 @@ namespace Deadlight.UI
 
             UIFactory.CreateTextAt(card.transform, "Teaser", levelTeasers[idx],
                 UITheme.FontCaption, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(16f, -198f), new Vector2(468f, 36f),
-                TextAnchor.UpperLeft);
+                new Vector2(0f, 1f), new Vector2(16f, -198f), new Vector2(468f, 44f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             // Status badge
             var statusGo = UIFactory.CreateCard(card.transform, "StatusBadge",
-                new Vector2(1f, 0f), new Vector2(120f, 30f), UITheme.BgLight);
+                new Vector2(1f, 0f), new Vector2(132f, 34f), UITheme.BgLight);
             statusGo.GetComponent<RectTransform>().pivot = new Vector2(1f, 0f);
             statusGo.GetComponent<RectTransform>().anchoredPosition = new Vector2(-12f, 12f);
 
@@ -586,60 +621,171 @@ namespace Deadlight.UI
         private void BuildGuidePanel()
         {
             _guidePanel = UIFactory.CreateFullPanel(_canvasRoot.transform, "GuidePanel",
-                new Color(0.03f, 0.04f, 0.06f, 0.97f));
+                new Color(0.02f, 0.03f, 0.05f, 0.96f));
 
             UIFactory.CreateTextAt(_guidePanel.transform, "Title", "SURVIVAL GUIDE",
-                UITheme.FontTitle + 4, UITheme.TextPrimary,
-                new Vector2(0.5f, 1f), new Vector2(-280f, -32f), new Vector2(560f, 48f),
+                UITheme.FontTitle + 6, UITheme.TextPrimary,
+                new Vector2(0.5f, 1f), new Vector2(-320f, -28f), new Vector2(640f, 54f),
                 TextAnchor.MiddleCenter, FontStyle.Bold);
 
             UIFactory.CreateTextAt(_guidePanel.transform, "Subtitle",
-                "Controls, core rules, and item explanations",
-                UITheme.FontBody, UITheme.TextSecondary,
-                new Vector2(0.5f, 1f), new Vector2(-340f, -82f), new Vector2(680f, 24f),
+                "Controls, loop rules, and item systems",
+                UITheme.FontBody - 1, UITheme.WithAlpha(UITheme.TextSecondary, 0.95f),
+                new Vector2(0.5f, 1f), new Vector2(-330f, -86f), new Vector2(660f, 26f),
                 TextAnchor.MiddleCenter);
 
             // Three-column layout
             BuildGuideSection("ControlsCol", "CONTROLS", GameplayGuideContent.GetControlsText(),
-                new Vector2(0.04f, 0.14f), new Vector2(0.34f, 0.84f));
+                new Vector2(0.035f, 0.13f), new Vector2(0.34f, 0.86f), UITheme.AccentBlue);
             BuildGuideSection("LoopCol", "SURVIVAL LOOP",
                 GameplayGuideContent.GetRulesText() + "\n\n" + GameplayGuideContent.GetSystemsText(),
-                new Vector2(0.36f, 0.14f), new Vector2(0.66f, 0.84f));
+                new Vector2(0.35f, 0.13f), new Vector2(0.665f, 0.86f), UITheme.AccentGold);
             BuildGuideSection("ItemsCol", "ITEMS & ONBOARDING",
                 GameplayGuideContent.GetItemsText() + "\n\n" + GameplayGuideContent.GetAccessibilityNote(),
-                new Vector2(0.68f, 0.14f), new Vector2(0.96f, 0.84f));
+                new Vector2(0.675f, 0.13f), new Vector2(0.965f, 0.86f), UITheme.AccentGreen);
 
             UIFactory.CreateTextAt(_guidePanel.transform, "Footer",
                 "Press H, F1, or Esc to close",
-                UITheme.FontCaption, UITheme.TextMuted,
-                new Vector2(0.5f, 0f), new Vector2(-200f, 68f), new Vector2(400f, 20f),
+                UITheme.FontCaption + 1, UITheme.WithAlpha(UITheme.TextMuted, 0.95f),
+                new Vector2(0.5f, 0f), new Vector2(-220f, 72f), new Vector2(440f, 22f),
                 TextAnchor.MiddleCenter);
 
             UIFactory.CreateCenteredButton(_guidePanel.transform, "CloseBtn", "CLOSE",
-                UITheme.AccentBlue, new Vector2(0.5f, 0.06f), new Vector2(200f, 42f), CloseGuide);
+                UITheme.AccentBlue, new Vector2(0.5f, 0.06f), new Vector2(220f, 46f), CloseGuide);
         }
 
         private void BuildGuideSection(string name, string title, string body,
-            Vector2 anchorMin, Vector2 anchorMax)
+            Vector2 anchorMin, Vector2 anchorMax, Color accentColor)
         {
             var section = UIFactory.CreateRegion(_guidePanel.transform, name,
-                anchorMin, anchorMax, UITheme.BgMedium, new Vector2(8f, 8f));
+                anchorMin, anchorMax, UITheme.Darken(UITheme.BgMedium, 0.10f), new Vector2(10f, 10f));
+
+            var accent = new GameObject("Accent");
+            accent.transform.SetParent(section.transform, false);
+            var accentRt = accent.AddComponent<RectTransform>();
+            accentRt.anchorMin = new Vector2(0f, 1f);
+            accentRt.anchorMax = new Vector2(1f, 1f);
+            accentRt.pivot = new Vector2(0.5f, 1f);
+            accentRt.anchoredPosition = Vector2.zero;
+            accentRt.sizeDelta = new Vector2(0f, 4f);
+            var accentImg = accent.AddComponent<Image>();
+            accentImg.color = UITheme.WithAlpha(accentColor, 0.95f);
+            accentImg.raycastTarget = false;
 
             var titleTxt = UIFactory.CreateText(section.transform, "Title", title,
-                UITheme.FontBody + 2, UITheme.AccentGold, TextAnchor.MiddleLeft, FontStyle.Bold);
+                UITheme.FontBody + 4, UITheme.WithAlpha(UITheme.TextPrimary, 0.98f), TextAnchor.MiddleLeft, FontStyle.Bold);
             var titleRt = titleTxt.GetComponent<RectTransform>();
             titleRt.anchorMin = new Vector2(0f, 1f);
             titleRt.anchorMax = new Vector2(1f, 1f);
-            titleRt.offsetMin = new Vector2(14f, -48f);
-            titleRt.offsetMax = new Vector2(-14f, -14f);
+            titleRt.offsetMin = new Vector2(16f, -56f);
+            titleRt.offsetMax = new Vector2(-16f, -12f);
 
-            var bodyTxt = UIFactory.CreateText(section.transform, "Body", body,
-                UITheme.FontBody - 1, UITheme.TextPrimary, TextAnchor.UpperLeft);
+            // Scrollable body to prevent clipping on lower resolutions.
+            var scrollObj = new GameObject("BodyScroll");
+            scrollObj.transform.SetParent(section.transform, false);
+            var scrollRt = scrollObj.AddComponent<RectTransform>();
+            scrollRt.anchorMin = Vector2.zero;
+            scrollRt.anchorMax = Vector2.one;
+            scrollRt.offsetMin = new Vector2(16f, 16f);
+            scrollRt.offsetMax = new Vector2(-16f, -68f);
+            var scrollRect = scrollObj.AddComponent<ScrollRect>();
+            scrollRect.horizontal = false;
+            scrollRect.vertical = true;
+            scrollRect.movementType = ScrollRect.MovementType.Clamped;
+            scrollRect.scrollSensitivity = 26f;
+            scrollRect.inertia = true;
+
+            var viewportObj = new GameObject("Viewport");
+            viewportObj.transform.SetParent(scrollObj.transform, false);
+            var viewportRt = viewportObj.AddComponent<RectTransform>();
+            viewportRt.anchorMin = Vector2.zero;
+            viewportRt.anchorMax = Vector2.one;
+            viewportRt.offsetMin = new Vector2(0f, 0f);
+            viewportRt.offsetMax = new Vector2(-12f, 0f);
+            var viewportImage = viewportObj.AddComponent<Image>();
+            viewportImage.color = new Color(0f, 0f, 0f, 0.01f); // invisible hit-target for scroll input
+            viewportImage.raycastTarget = true;
+            var viewportMask = viewportObj.AddComponent<Mask>();
+            viewportMask.showMaskGraphic = false;
+            scrollRect.viewport = viewportRt;
+
+            var contentObj = new GameObject("Content");
+            contentObj.transform.SetParent(viewportObj.transform, false);
+            var contentRt = contentObj.AddComponent<RectTransform>();
+            contentRt.anchorMin = new Vector2(0f, 1f);
+            contentRt.anchorMax = new Vector2(1f, 1f);
+            contentRt.pivot = new Vector2(0.5f, 1f);
+            contentRt.anchoredPosition = Vector2.zero;
+            contentRt.sizeDelta = Vector2.zero;
+
+            var contentLayout = contentObj.AddComponent<VerticalLayoutGroup>();
+            contentLayout.spacing = 0f;
+            contentLayout.childAlignment = TextAnchor.UpperLeft;
+            contentLayout.childControlWidth = true;
+            contentLayout.childControlHeight = true;
+            contentLayout.childForceExpandWidth = true;
+            contentLayout.childForceExpandHeight = false;
+
+            var contentFitter = contentObj.AddComponent<ContentSizeFitter>();
+            contentFitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+            contentFitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+
+            var bodyTxt = UIFactory.CreateText(contentObj.transform, "Body", body,
+                UITheme.FontBody + 1, UITheme.WithAlpha(UITheme.TextPrimary, 0.98f), TextAnchor.UpperLeft);
             var bodyRt = bodyTxt.GetComponent<RectTransform>();
-            bodyRt.anchorMin = Vector2.zero;
-            bodyRt.anchorMax = Vector2.one;
-            bodyRt.offsetMin = new Vector2(14f, 14f);
-            bodyRt.offsetMax = new Vector2(-14f, -60f);
+            bodyRt.anchorMin = new Vector2(0f, 1f);
+            bodyRt.anchorMax = new Vector2(1f, 1f);
+            bodyRt.pivot = new Vector2(0.5f, 1f);
+            bodyRt.anchoredPosition = Vector2.zero;
+            bodyRt.sizeDelta = Vector2.zero;
+            bodyTxt.lineSpacing = 1.2f;
+            bodyTxt.supportRichText = true;
+            bodyTxt.horizontalOverflow = HorizontalWrapMode.Wrap;
+            bodyTxt.verticalOverflow = VerticalWrapMode.Overflow;
+            bodyTxt.raycastTarget = true;
+            scrollRect.content = contentRt;
+
+            var scrollbarObj = new GameObject("Scrollbar");
+            scrollbarObj.transform.SetParent(scrollObj.transform, false);
+            var scrollbarRt = scrollbarObj.AddComponent<RectTransform>();
+            scrollbarRt.anchorMin = new Vector2(1f, 0f);
+            scrollbarRt.anchorMax = new Vector2(1f, 1f);
+            scrollbarRt.pivot = new Vector2(1f, 0.5f);
+            scrollbarRt.offsetMin = new Vector2(-10f, 0f);
+            scrollbarRt.offsetMax = Vector2.zero;
+            var scrollbarBg = scrollbarObj.AddComponent<Image>();
+            scrollbarBg.color = UITheme.WithAlpha(UITheme.BgLight, 0.45f);
+
+            var slidingArea = new GameObject("SlidingArea");
+            slidingArea.transform.SetParent(scrollbarObj.transform, false);
+            var slidingRt = slidingArea.AddComponent<RectTransform>();
+            slidingRt.anchorMin = Vector2.zero;
+            slidingRt.anchorMax = Vector2.one;
+            slidingRt.offsetMin = Vector2.zero;
+            slidingRt.offsetMax = Vector2.zero;
+
+            var handleObj = new GameObject("Handle");
+            handleObj.transform.SetParent(slidingArea.transform, false);
+            var handleRt = handleObj.AddComponent<RectTransform>();
+            handleRt.anchorMin = new Vector2(0f, 1f);
+            handleRt.anchorMax = new Vector2(1f, 1f);
+            handleRt.pivot = new Vector2(0.5f, 1f);
+            handleRt.sizeDelta = new Vector2(0f, 72f);
+            var handleImage = handleObj.AddComponent<Image>();
+            handleImage.color = UITheme.WithAlpha(accentColor, 0.95f);
+
+            var scrollbar = scrollbarObj.AddComponent<Scrollbar>();
+            scrollbar.direction = Scrollbar.Direction.BottomToTop;
+            scrollbar.handleRect = handleRt;
+            scrollbar.targetGraphic = handleImage;
+            scrollbar.size = 0.35f;
+            scrollbar.value = 1f;
+            scrollRect.verticalScrollbar = scrollbar;
+            scrollRect.verticalScrollbarVisibility = ScrollRect.ScrollbarVisibility.AutoHideAndExpandViewport;
+            scrollRect.verticalScrollbarSpacing = 4f;
+
+            Canvas.ForceUpdateCanvases();
+            scrollRect.verticalNormalizedPosition = 1f;
         }
 
         // =====================================================================
@@ -680,22 +826,17 @@ namespace Deadlight.UI
 
             var healBtn = UIFactory.CreateCenteredButton(supplyRow.transform, "HealBtn",
                 $"Health Kit +1 ({HealCost})", UITheme.AccentRed,
-                new Vector2(0.125f, 0.5f), new Vector2(200f, 32f), BuyHealthKit);
+                new Vector2(0.17f, 0.5f), new Vector2(200f, 32f), BuyHealthKit);
             _shopBuyButtons.Add(healBtn);
-
-            var ammoBtn = UIFactory.CreateCenteredButton(supplyRow.transform, "AmmoBtn",
-                $"Ammo Refill ({AmmoRefillCost})", UITheme.AccentOrange,
-                new Vector2(0.375f, 0.5f), new Vector2(200f, 32f), BuyAmmoRefill);
-            _shopBuyButtons.Add(ammoBtn);
 
             var grenadeBtn = UIFactory.CreateCenteredButton(supplyRow.transform, "GrenadeBtn",
                 $"Grenade +1 ({GrenadeRefillCost})", UITheme.AccentGreen,
-                new Vector2(0.625f, 0.5f), new Vector2(200f, 32f), BuyGrenadeRefill);
+                new Vector2(0.5f, 0.5f), new Vector2(200f, 32f), BuyGrenadeRefill);
             _shopBuyButtons.Add(grenadeBtn);
 
             var molotovBtn = UIFactory.CreateCenteredButton(supplyRow.transform, "MolotovBtn",
                 $"Molotov +1 ({MolotovRefillCost})", UITheme.Darken(UITheme.AccentOrange, 0.18f),
-                new Vector2(0.875f, 0.5f), new Vector2(200f, 32f), BuyMolotovRefill);
+                new Vector2(0.83f, 0.5f), new Vector2(200f, 32f), BuyMolotovRefill);
             _shopBuyButtons.Add(molotovBtn);
 
             // Tabs
@@ -747,14 +888,78 @@ namespace Deadlight.UI
 
         private void BuildWeaponItems()
         {
-            float y = 0f;
-            const int h = 56;
-            AddWeaponShopItem("Shotgun", "Close-range spread", 100, 1, WeaponType.Shotgun, ref y, h);
+            BuildAmmoPurchaseSection();
+
+            float y = -282f;
+            const int h = 64;
             AddWeaponShopItem("SMG", "Fast fire rate", 150, 2, WeaponType.SMG, ref y, h);
             AddWeaponShopItem("Sniper Rifle", "High damage, long range", 250, 2, WeaponType.SniperRifle, ref y, h);
             AddWeaponShopItem("Assault Rifle", "Balanced auto", 200, 3, WeaponType.AssaultRifle, ref y, h);
             AddWeaponShopItem("Grenade Launcher", "Area damage", 350, 3, WeaponType.GrenadeLauncher, ref y, h);
             AddWeaponShopItem("Flamethrower", "Burn DoT", 400, 4, WeaponType.Flamethrower, ref y, h);
+        }
+
+        private void BuildAmmoPurchaseSection()
+        {
+            _ammoPurchaseRows.Clear();
+
+            UIFactory.CreateTextAt(_weaponsTabContent.transform, "AmmoHeader", "WEAPON AMMO",
+                UITheme.FontBody + 2, UITheme.AccentOrange,
+                new Vector2(0f, 1f), new Vector2(16f, -10f), new Vector2(240f, 20f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
+
+            UIFactory.CreateTextAt(_weaponsTabContent.transform, "AmmoSubtitle",
+                "Each ammo purchase targets a specific weapon slot.",
+                UITheme.FontCaption, UITheme.TextMuted,
+                new Vector2(0f, 1f), new Vector2(16f, -32f), new Vector2(420f, 18f),
+                TextAnchor.UpperLeft);
+
+            float y = -58f;
+            for (int slot = 0; slot < AmmoSlotCount; slot++)
+            {
+                AddAmmoPurchaseRow(slot, y, 48);
+                y -= 52f;
+            }
+        }
+
+        private void AddAmmoPurchaseRow(int slot, float y, int height)
+        {
+            var root = CreateShopRow(_weaponsTabContent.transform, $"AmmoSlot_{slot + 1}", height,
+                UITheme.Darken(UITheme.AccentOrange, 0.46f));
+            var rt = root.GetComponent<RectTransform>();
+            rt.anchorMin = rt.anchorMax = new Vector2(0.5f, 1f);
+            rt.pivot = new Vector2(0.5f, 1f);
+            rt.anchoredPosition = new Vector2(0f, y);
+            rt.sizeDelta = new Vector2(560f, height - 4);
+
+            var title = UIFactory.CreateTextAt(root.transform, "Title", "",
+                UITheme.FontBody - 1, UITheme.TextPrimary,
+                new Vector2(0f, 1f), new Vector2(14f, -8f), new Vector2(360f, 18f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
+            title.horizontalOverflow = HorizontalWrapMode.Overflow;
+            title.verticalOverflow = VerticalWrapMode.Truncate;
+
+            var status = UIFactory.CreateTextAt(root.transform, "Status", "",
+                UITheme.FontCaption, UITheme.TextSecondary,
+                new Vector2(0f, 1f), new Vector2(14f, -27f), new Vector2(340f, 16f),
+                TextAnchor.UpperLeft);
+            status.horizontalOverflow = HorizontalWrapMode.Overflow;
+            status.verticalOverflow = VerticalWrapMode.Truncate;
+
+            var buyBtn = UIFactory.CreateCenteredButton(root.transform, "Buy", "BUY AMMO",
+                UITheme.AccentOrange, new Vector2(1f, 0.5f), new Vector2(132f, 28f),
+                () => BuyAmmoForSlot(slot));
+            buyBtn.GetComponent<RectTransform>().anchoredPosition = new Vector2(-76f, 0f);
+
+            _ammoPurchaseRows.Add(new AmmoPurchaseRowBinding
+            {
+                Slot = slot,
+                Root = root,
+                TitleText = title,
+                StatusText = status,
+                BuyButton = buyBtn,
+                ButtonLabel = buyBtn.GetComponentInChildren<Text>()
+            });
         }
 
         private void AddWeaponShopItem(string name, string desc, int cost, int unlockNight,
@@ -776,8 +981,8 @@ namespace Deadlight.UI
                 TextAnchor.MiddleLeft, FontStyle.Bold);
 
             UIFactory.CreateTextAt(root.transform, "Desc", $"{desc}  ·  {cost} pts",
-                UITheme.FontSmall + 1, UITheme.TextMuted,
-                new Vector2(0f, 0.5f), new Vector2(14f, -12f), new Vector2(320f, 16f),
+                UITheme.FontCaption, UITheme.TextSecondary,
+                new Vector2(0f, 0.5f), new Vector2(14f, -13f), new Vector2(320f, 18f),
                 TextAnchor.MiddleLeft);
 
             var weaponType = wt;
@@ -837,10 +1042,10 @@ namespace Deadlight.UI
         {
             float y = 0f;
             const int h = 56;
-            AddArmorItem("Vest Lv1", "Light body armor", 80, ArmorTier.Level1, false, ref y, h);
-            AddArmorItem("Vest Lv2", "Heavy body armor", 180, ArmorTier.Level2, false, ref y, h);
-            AddArmorItem("Helmet Lv1", "Basic protection", 60, ArmorTier.Level1, true, ref y, h);
-            AddArmorItem("Helmet Lv2", "Reinforced helmet", 140, ArmorTier.Level2, true, ref y, h);
+            AddArmorItem("Vest Lv1",    "Light body armor",  80,  ArmorTier.Level1, false, ref y, h);
+            AddArmorItem("Vest Lv2",    "Heavy body armor",  180, ArmorTier.Level2, false, ref y, h);
+            AddArmorItem("Helmet Lv1",  "Basic protection",  60,  ArmorTier.Level1, true,  ref y, h);
+            AddArmorItem("Helmet Lv2",  "Reinforced helmet", 140, ArmorTier.Level2, true,  ref y, h);
         }
 
         private void AddArmorItem(string name, string desc, int cost,
@@ -863,20 +1068,39 @@ namespace Deadlight.UI
                 TextAnchor.MiddleLeft, FontStyle.Bold);
 
             UIFactory.CreateTextAt(root.transform, "Desc", $"{desc}  ·  {cost} pts",
-                UITheme.FontSmall + 1, UITheme.TextMuted,
-                new Vector2(0f, 0.5f), new Vector2(14f, -12f), new Vector2(320f, 16f),
+                UITheme.FontCaption, UITheme.TextSecondary,
+                new Vector2(0f, 0.5f), new Vector2(14f, -13f), new Vector2(320f, 18f),
                 TextAnchor.MiddleLeft);
 
             var t = tier;
-            var h = isHelmet;
+            var helm = isHelmet;
             var c = cost;
             var buyBtn = UIFactory.CreateCenteredButton(root.transform, "Buy", "BUY",
                 UITheme.AccentBlue, new Vector2(1f, 0.5f), new Vector2(76f, 30f),
-                () => BuyArmor(t, h, c));
+                () => BuyArmor(t, helm, c));
             buyBtn.GetComponent<RectTransform>().anchoredPosition = new Vector2(-48f, 0f);
 
             _shopBuyButtons.Add(buyBtn);
             y -= height;
+        }
+
+        private static GameObject CreateShopRow(Transform parent, string name, int preferredHeight, Color background)
+        {
+            var root = new GameObject(name);
+            root.transform.SetParent(parent, false);
+            root.AddComponent<RectTransform>();
+            root.AddComponent<Image>().color = background;
+            UIFactory.AddLayoutElement(root, preferredHeight: preferredHeight);
+            return root;
+        }
+
+        private static Text CreateShopRowText(Transform parent, string name, string content,
+            int fontSize, Color color, Vector2 anchor, Vector2 anchoredPosition, Vector2 size,
+            TextAnchor alignment, FontStyle style = FontStyle.Normal)
+        {
+            var text = UIFactory.CreateText(parent, name, content, fontSize, color, alignment, style);
+            UIFactory.SetAnchored(text.rectTransform, anchor, anchoredPosition, size, new Vector2(0f, 0.5f));
+            return text;
         }
 
         // =====================================================================
@@ -895,14 +1119,14 @@ namespace Deadlight.UI
 
             _levelCompleteStatsText = UIFactory.CreateTextAt(_levelCompletePanel.transform, "Stats", "",
                 UITheme.FontBody + 2, UITheme.TextPrimary,
-                new Vector2(0.5f, 0.48f), new Vector2(-240f, 80f), new Vector2(480f, 180f),
+                new Vector2(0.5f, 0.48f), new Vector2(-280f, 88f), new Vector2(560f, 240f),
                 TextAnchor.MiddleCenter);
 
-            UIFactory.CreateCenteredButton(_levelCompletePanel.transform, "NextBtn", "NEXT LEVEL",
+            UIFactory.CreateCenteredButton(_levelCompletePanel.transform, "NextBtn", "DEPLOY NEXT LEVEL",
                 UITheme.AccentGreen, new Vector2(0.4f, 0.18f), new Vector2(220f, 50f), OnNextLevel);
 
-            UIFactory.CreateCenteredButton(_levelCompletePanel.transform, "MenuBtn", "MAIN MENU",
-                UITheme.BgLight, new Vector2(0.6f, 0.18f), new Vector2(180f, 46f), GoToMainMenu);
+            UIFactory.CreateCenteredButton(_levelCompletePanel.transform, "MenuBtn", "RETURN TO MAIN MENU",
+                UITheme.BgLight, new Vector2(0.6f, 0.18f), new Vector2(220f, 46f), GoToMainMenu);
         }
 
         private void BuildGameOverScreen()
@@ -962,28 +1186,82 @@ namespace Deadlight.UI
             _leaderboardPanel = UIFactory.CreateFullPanel(_canvasRoot.transform, "LeaderboardPanel",
                 new Color(0.04f, 0.04f, 0.08f, 0.96f));
 
-            UIFactory.CreateTextAt(_leaderboardPanel.transform, "Title", "LEADERBOARD",
-                UITheme.FontTitle + 2, UITheme.AccentGold,
-                new Vector2(0.5f, 0.93f), new Vector2(-220f, -10f), new Vector2(440f, 48f),
-                TextAnchor.MiddleCenter, FontStyle.Bold);
+            var frame = UIFactory.CreateCard(_leaderboardPanel.transform, "BoardFrame",
+                new Vector2(0.5f, 0.5f), new Vector2(1140f, 760f), UITheme.BgMedium);
 
-            UIFactory.CreateTextAt(_leaderboardPanel.transform, "Header",
-                "RANK    SCORE    LEVELS    KILLS    MAP",
-                UITheme.FontCaption + 1, UITheme.TextMuted,
-                new Vector2(0.5f, 0.85f), new Vector2(-360f, 0f), new Vector2(720f, 22f),
-                TextAnchor.MiddleCenter);
+            UIFactory.CreateTextAt(frame.transform, "Title", "LEADERBOARD",
+                UITheme.FontTitle + 4, UITheme.TextPrimary,
+                new Vector2(0f, 1f), new Vector2(42f, -34f), new Vector2(420f, 48f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
+            UIFactory.CreateTextAt(frame.transform, "Subtitle",
+                "Top campaign runs by score, nights survived, and kill count.",
+                UITheme.FontCaption, UITheme.TextSecondary,
+                new Vector2(0f, 1f), new Vector2(44f, -84f), new Vector2(620f, 26f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
+
+            float headerY = -138f;
+            CreateLeaderboardHeader(frame.transform, "RankHeader", "RANK", new Vector2(48f, headerY), 90f);
+            CreateLeaderboardHeader(frame.transform, "ScoreHeader", "SCORE", new Vector2(156f, headerY), 170f);
+            CreateLeaderboardHeader(frame.transform, "NightsHeader", "NIGHTS", new Vector2(352f, headerY), 140f);
+            CreateLeaderboardHeader(frame.transform, "KillsHeader", "KILLS", new Vector2(518f, headerY), 140f);
+            CreateLeaderboardHeader(frame.transform, "MapHeader", "DEPLOYMENT", new Vector2(684f, headerY), 360f);
+
+            _leaderboardRows.Clear();
+            float rowY = -178f;
             for (int i = 0; i < 10; i++)
             {
-                float yPos = 0.79f - i * 0.065f;
-                UIFactory.CreateTextAt(_leaderboardPanel.transform, $"Entry_{i}", "",
-                    UITheme.FontBody - 1, UITheme.TextPrimary,
-                    new Vector2(0.5f, yPos), new Vector2(-380f, 0f), new Vector2(760f, 24f),
-                    TextAnchor.MiddleCenter);
+                CreateLeaderboardRow(frame.transform, i, new Vector2(40f, rowY));
+                rowY -= 54f;
             }
 
             UIFactory.CreateCenteredButton(_leaderboardPanel.transform, "BackBtn", "BACK",
                 UITheme.BgLight, new Vector2(0.5f, 0.06f), new Vector2(180f, 42f), HideLeaderboard);
+        }
+
+        private void CreateLeaderboardHeader(Transform parent, string name, string label, Vector2 pos, float width)
+        {
+            UIFactory.CreateTextAt(parent, name, label,
+                UITheme.FontCaption, UITheme.TextMuted,
+                new Vector2(0f, 1f), pos, new Vector2(width, 20f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
+        }
+
+        private void CreateLeaderboardRow(Transform parent, int index, Vector2 pos)
+        {
+            var row = UIFactory.CreateCard(parent, $"EntryRow_{index}",
+                new Vector2(0f, 1f), new Vector2(1060f, 42f),
+                index % 2 == 0 ? UITheme.BgLight : UITheme.Darken(UITheme.BgLight, 0.12f));
+            var rowRt = row.GetComponent<RectTransform>();
+            rowRt.pivot = new Vector2(0f, 1f);
+            rowRt.anchoredPosition = pos;
+
+            var binding = new LeaderboardRowBinding
+            {
+                Background = row.GetComponent<Image>(),
+                RankText = UIFactory.CreateTextAt(row.transform, "Rank", "",
+                    UITheme.FontCaption, UITheme.TextPrimary,
+                    new Vector2(0f, 1f), new Vector2(16f, -11f), new Vector2(80f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold),
+                ScoreText = UIFactory.CreateTextAt(row.transform, "Score", "",
+                    UITheme.FontCaption, UITheme.TextPrimary,
+                    new Vector2(0f, 1f), new Vector2(124f, -11f), new Vector2(150f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold),
+                NightsText = UIFactory.CreateTextAt(row.transform, "Nights", "",
+                    UITheme.FontCaption, UITheme.TextSecondary,
+                    new Vector2(0f, 1f), new Vector2(320f, -11f), new Vector2(110f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold),
+                KillsText = UIFactory.CreateTextAt(row.transform, "Kills", "",
+                    UITheme.FontCaption, UITheme.TextSecondary,
+                    new Vector2(0f, 1f), new Vector2(486f, -11f), new Vector2(110f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold),
+                MapText = UIFactory.CreateTextAt(row.transform, "Map", "",
+                    UITheme.FontCaption, UITheme.TextSecondary,
+                    new Vector2(0f, 1f), new Vector2(652f, -11f), new Vector2(380f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold)
+            };
+
+            _leaderboardRows.Add(binding);
         }
 
         // =====================================================================
@@ -1017,7 +1295,8 @@ namespace Deadlight.UI
 
         private void StartCampaignAtLevel(int level)
         {
-            if (level > MaxSelectableLevel) return;
+            if (level > GetSelectableLevelCap()) return;
+            if (!IsLevelUnlocked(level)) return;
 
             Time.timeScale = 1f;
             HideAllPanelsImmediate();
@@ -1042,32 +1321,32 @@ namespace Deadlight.UI
                 _mainMenuProgressText.text = $"Level {highest:00} ready: {levelObjectiveSummaries[highest - 1]}";
 
             if (_mapSelectProgressText != null)
-                _mapSelectProgressText.text = $"Unlocked through Level {highest:00}. Levels 3 and 4 are locked for now.";
+                _mapSelectProgressText.text = $"Highest unlocked level: {highest:00}. Clear the active sector to unlock the next.";
 
             foreach (var row in _campaignRouteRows)
             {
-                bool unlocked = row.Level <= MaxSelectableLevel && IsLevelUnlocked(row.Level);
+                bool unlocked = IsLevelUnlocked(row.Level);
                 bool ready = unlocked && row.Level == highest;
                 row.StatusText.text = ready ? "READY" : unlocked ? "UNLOCKED" : "LOCKED";
                 row.StatusBackground.color = ready
-                    ? UITheme.Darken(UITheme.AccentGreen, 0.35f)
-                    : unlocked ? UITheme.BgLight : UITheme.Darken(UITheme.AccentRed, 0.5f);
+                    ? UITheme.Darken(UITheme.AccentGreen, 0.28f)
+                    : unlocked ? UITheme.Darken(UITheme.AccentBlue, 0.38f) : UITheme.Darken(UITheme.AccentRed, 0.42f);
             }
 
             foreach (var card in _campaignCards)
             {
-                bool unlocked = card.Level <= MaxSelectableLevel && IsLevelUnlocked(card.Level);
+                bool unlocked = IsLevelUnlocked(card.Level);
                 bool ready = unlocked && card.Level == highest;
 
                 if (card.Button != null) card.Button.interactable = unlocked;
                 if (card.StatusText != null)
                 {
                     card.StatusText.text = ready ? "READY" : unlocked ? "UNLOCKED" : "LOCKED";
-                    card.StatusText.color = unlocked ? UITheme.TextPrimary : UITheme.TextMuted;
+                    card.StatusText.color = unlocked ? UITheme.TextPrimary : UITheme.WithAlpha(UITheme.TextPrimary, 0.92f);
                 }
                 if (card.ActionText != null)
                 {
-                    card.ActionText.text = unlocked ? "DEPLOY" : "LOCKED";
+                    card.ActionText.text = unlocked ? "DEPLOY" : $"COMPLETE L{Mathf.Max(1, card.Level - 1)}";
                     card.ActionText.color = unlocked ? UITheme.TextPrimary : UITheme.TextMuted;
                 }
                 if (card.PreviewImage != null)
@@ -1077,16 +1356,28 @@ namespace Deadlight.UI
                         : (unlocked ? card.FallbackColor : UITheme.Darken(card.FallbackColor, 0.3f));
                 }
                 if (card.LockOverlay != null)
-                    card.LockOverlay.color = unlocked ? Color.clear : new Color(0f, 0f, 0f, 0.3f);
+                    card.LockOverlay.color = unlocked ? Color.clear : new Color(0f, 0f, 0f, 0.38f);
             }
         }
 
         private int GetHighestUnlockedLevel()
         {
             int h = 1;
-            for (int i = 1; i <= Mathf.Min(levelMapNames.Length, MaxSelectableLevel); i++)
+            int selectableCap = GetSelectableLevelCap();
+            for (int i = 1; i <= selectableCap; i++)
                 if (IsLevelUnlocked(i)) h = i;
             return h;
+        }
+
+        private int GetSelectableLevelCap()
+        {
+            int totalDefinedLevels = Mathf.Min(levelMapNames.Length, GameManager.TotalLevels);
+            if (GameManager.Instance == null)
+            {
+                return totalDefinedLevels;
+            }
+
+            return Mathf.Clamp(GameManager.Instance.PlayableLevelCap, 1, totalDefinedLevels);
         }
 
         private bool IsLevelUnlocked(int level)
@@ -1166,13 +1457,19 @@ namespace Deadlight.UI
 
         private void BuyWeapon(WeaponType wt, int cost, int unlockNight)
         {
-            if (_purchasedWeapons.Contains(wt)) return;
+            if (_purchasedWeapons.Contains(wt) || PlayerAlreadyHasWeapon(wt)) return;
             if (PointsSystem.Instance == null || !PointsSystem.Instance.CanAfford(cost)) return;
-            int level = GameManager.Instance?.CurrentLevel ?? 1;
-            if (level < unlockNight) return;
-            if (!PointsSystem.Instance.SpendPoints(cost, $"Weapon: {wt}")) return;
+            int progressionNight = GameManager.Instance?.CurrentNight ?? 1;
+            if (progressionNight < unlockNight) return;
 
-            _purchasedWeapons.Add(wt);
+            var player = GameObject.Find("Player");
+            var shooting = player != null ? player.GetComponent<PlayerShooting>() : null;
+            if (shooting == null) return;
+            if (!shooting.HasFreeWeaponSlot())
+            {
+                RadioTransmissions.Instance?.ShowMessage("Loadout full (4/4). No free weapon slot.", 2.8f);
+                return;
+            }
 
             WeaponData weapon = wt switch
             {
@@ -1186,13 +1483,27 @@ namespace Deadlight.UI
                 _ => null
             };
 
-            if (weapon != null)
+            if (weapon == null) return;
+            if (!PointsSystem.Instance.SpendPoints(cost, $"Weapon: {wt}")) return;
+
+            if (!shooting.TryAddWeaponToLoadout(weapon, true))
             {
-                var player = GameObject.Find("Player");
-                player?.GetComponent<PlayerShooting>()?.SetSecondWeapon(weapon);
+                // Should be rare due pre-check, but keep a clear fallback message.
+                RadioTransmissions.Instance?.ShowMessage("Unable to equip weapon: loadout slots unavailable.", 2.8f);
+                return;
             }
 
+            _purchasedWeapons.Add(wt);
             RefreshShop();
+        }
+
+        private static bool PlayerAlreadyHasWeapon(WeaponType weaponType)
+        {
+            var player = GameObject.Find("Player");
+            if (player == null) return false;
+
+            var shooting = player.GetComponent<PlayerShooting>();
+            return shooting != null && shooting.HasWeaponType(weaponType);
         }
 
         private void BuyHealthKit()
@@ -1203,11 +1514,51 @@ namespace Deadlight.UI
             RefreshShop();
         }
 
-        private void BuyAmmoRefill()
+        private void BuyAmmoForSlot(int slot)
         {
-            if (PointsSystem.Instance == null || !PointsSystem.Instance.CanAfford(AmmoRefillCost)) return;
-            if (!PointsSystem.Instance.SpendPoints(AmmoRefillCost, "Ammo Refill")) return;
-            GameObject.Find("Player")?.GetComponent<PlayerShooting>()?.AddAmmo(60);
+            var shooting = GetPlayerShooting();
+            if (shooting == null)
+            {
+                return;
+            }
+
+            var weapon = shooting.GetSlotWeapon(slot);
+            if (weapon == null)
+            {
+                RadioTransmissions.Instance?.ShowMessage($"Slot {slot + 1} has no weapon equipped.", 2.4f);
+                RefreshShop();
+                return;
+            }
+
+            if (shooting.IsSlotReserveFull(slot))
+            {
+                RadioTransmissions.Instance?.ShowMessage($"{weapon.weaponName} ammo is already full.", 2.2f);
+                RefreshShop();
+                return;
+            }
+
+            if (PointsSystem.Instance == null || !PointsSystem.Instance.CanAfford(AmmoRefillCost))
+            {
+                return;
+            }
+
+            if (!shooting.TryAddAmmoToSlot(slot, AmmoPurchaseAmount, out int added) || added <= 0)
+            {
+                RadioTransmissions.Instance?.ShowMessage($"{weapon.weaponName} ammo is already full.", 2.2f);
+                RefreshShop();
+                return;
+            }
+
+            if (!PointsSystem.Instance.SpendPoints(AmmoRefillCost, $"{weapon.weaponName} Ammo"))
+            {
+                Debug.LogWarning($"[GameUI] Failed to spend points for {weapon.weaponName} ammo after granting ammo.");
+                RefreshShop();
+                return;
+            }
+
+            RadioTransmissions.Instance?.ShowMessage(
+                $"{weapon.weaponName} ammo replenished in slot {slot + 1}.",
+                2.4f);
             RefreshShop();
         }
 
@@ -1249,6 +1600,11 @@ namespace Deadlight.UI
 
         private void UpdateShopDisplay()
         {
+            if (_dawnShopPanel != null && _dawnShopPanel.activeSelf)
+            {
+                HookPlayerShootingEvents();
+            }
+
             if (_shopPointsText != null && PointsSystem.Instance != null)
                 _shopPointsText.text = $"Points: {PointsSystem.Instance.CurrentPoints}";
 
@@ -1272,15 +1628,14 @@ namespace Deadlight.UI
                 _shopSummaryText.text = summary;
             }
 
-            int night = GameManager.Instance?.CurrentLevel ?? 1;
+            int progressionNight = GameManager.Instance?.CurrentNight ?? 1;
             bool needsHeal = NeedsMedkits(out var medkits);
             bool needsGrenade = NeedsGrenades(out _);
             bool needsMolotov = NeedsMolotovs(out _);
             bool canHeal = needsHeal && PointsSystem.Instance != null && PointsSystem.Instance.CanAfford(HealCost);
             UpdateSupplyButton(0, HealCost, canHeal);
-            UpdateSupplyButton(1, AmmoRefillCost);
-            UpdateSupplyButton(2, GrenadeRefillCost, needsGrenade);
-            UpdateSupplyButton(3, MolotovRefillCost, needsMolotov);
+            UpdateSupplyButton(1, GrenadeRefillCost, needsGrenade);
+            UpdateSupplyButton(2, MolotovRefillCost, needsMolotov);
 
             if (_shopBuyButtons.Count > 0)
             {
@@ -1293,32 +1648,47 @@ namespace Deadlight.UI
                 }
             }
 
-            if (_shopBuyButtons.Count > 2)
+            if (_shopBuyButtons.Count > 1)
             {
-                var lbl = _shopBuyButtons[2].GetComponentInChildren<Text>();
+                var lbl = _shopBuyButtons[1].GetComponentInChildren<Text>();
                 if (lbl != null) lbl.text = needsGrenade ? $"Grenade +1 ({GrenadeRefillCost})" : "Grenades Full";
             }
 
-            if (_shopBuyButtons.Count > 3)
+            if (_shopBuyButtons.Count > 2)
             {
-                var lbl = _shopBuyButtons[3].GetComponentInChildren<Text>();
+                var lbl = _shopBuyButtons[2].GetComponentInChildren<Text>();
                 if (lbl != null) lbl.text = needsMolotov ? $"Molotov +1 ({MolotovRefillCost})" : "Molotovs Full";
             }
 
-            WeaponType[] wts = { WeaponType.Shotgun, WeaponType.SMG, WeaponType.SniperRifle, WeaponType.AssaultRifle, WeaponType.GrenadeLauncher, WeaponType.Flamethrower };
-            int[] costs = { 100, 150, 250, 200, 350, 400 };
-            int[] nights = { 1, 2, 2, 3, 3, 4 };
+            if (_observedPlayerShooting != null)
+            {
+                UpdateAmmoPurchaseRows(_observedPlayerShooting);
+            }
+            else
+            {
+                UpdateAmmoPurchaseRows(GetPlayerShooting());
+            }
+
+            WeaponType[] wts = { WeaponType.SMG, WeaponType.SniperRifle, WeaponType.AssaultRifle, WeaponType.GrenadeLauncher, WeaponType.Flamethrower };
+            int[] costs = { 150, 250, 200, 350, 400 };
+            int[] requiredNights = { 2, 2, 3, 3, 4 };
             for (int i = 0; i < wts.Length; i++)
             {
                 int idx = SupplyButtonCount + i;
                 if (idx >= _shopBuyButtons.Count) break;
                 var b = _shopBuyButtons[idx];
-                bool sold = _purchasedWeapons.Contains(wts[i]);
+                bool sold = _purchasedWeapons.Contains(wts[i]) || PlayerAlreadyHasWeapon(wts[i]);
                 bool afford = PointsSystem.Instance != null && PointsSystem.Instance.CanAfford(costs[i]);
-                bool unlocked = night >= nights[i];
-                b.interactable = !sold && afford && unlocked;
+                bool unlocked = progressionNight >= requiredNights[i];
+                bool canBuy = !sold && afford && unlocked;
+                b.interactable = canBuy;
                 var lt = b.GetComponentInChildren<Text>();
-                if (lt != null) lt.text = sold ? "SOLD" : (unlocked ? "BUY" : $"Lv{nights[i]}+");
+                if (lt != null) lt.text = sold ? "OWNED" : (unlocked ? "BUY" : $"N{requiredNights[i]}+");
+                var img = b.GetComponent<Image>();
+                if (img != null)
+                    img.color = sold ? UITheme.BgLight
+                        : unlocked ? UITheme.AccentGreen
+                        : new Color(0.25f, 0.35f, 0.25f, 0.7f);
             }
 
             var upgrades = PlayerUpgrades.Instance;
@@ -1329,6 +1699,17 @@ namespace Deadlight.UI
                 UpdateUpgradeRow(2, upgrades.MagazineTier, PlayerUpgrades.MaxMagazineTier, upgrades.GetMagazineCost(), upgrades.GetMagazineDescription(), "Magazine");
                 UpdateUpgradeRow(3, upgrades.HealthTier, PlayerUpgrades.MaxHealthTier, upgrades.GetHealthCost(), upgrades.GetHealthDescription(), "Max Health");
                 UpdateUpgradeRow(4, upgrades.SprintTier, PlayerUpgrades.MaxSprintTier, upgrades.GetSprintCost(), upgrades.GetSprintDescription(), "Sprint Speed");
+            }
+
+            // Refresh armor buy buttons' interactability based on current points
+            int[] armorCosts = { 80, 180, 60, 140 };
+            int armorStart = SupplyButtonCount + wts.Length;
+            for (int i = 0; i < armorCosts.Length; i++)
+            {
+                int idx = armorStart + i;
+                if (idx >= _shopBuyButtons.Count) break;
+                _shopBuyButtons[idx].interactable =
+                    PointsSystem.Instance != null && PointsSystem.Instance.CanAfford(armorCosts[i]);
             }
         }
 
@@ -1387,8 +1768,75 @@ namespace Deadlight.UI
             if (lt != null) lt.text = maxed ? "MAX" : "UPGRADE";
         }
 
+        private void UpdateAmmoPurchaseRows(PlayerShooting shooting)
+        {
+            if (_ammoPurchaseRows.Count == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < _ammoPurchaseRows.Count; i++)
+            {
+                var row = _ammoPurchaseRows[i];
+                bool hasWeapon = shooting != null && shooting.HasWeaponInSlot(row.Slot);
+                WeaponData weapon = hasWeapon ? shooting.GetSlotWeapon(row.Slot) : null;
+                int currentAmmo = hasWeapon ? shooting.GetSlotCurrentAmmo(row.Slot) : 0;
+                int reserveAmmo = hasWeapon ? shooting.GetSlotReserveAmmo(row.Slot) : 0;
+                int reserveSpace = hasWeapon ? shooting.GetSlotReserveAmmoSpace(row.Slot) : 0;
+                bool full = hasWeapon && reserveSpace == 0;
+                bool active = shooting != null && shooting.ActiveSlot == row.Slot;
+
+                if (row.Root != null)
+                {
+                    var img = row.Root.GetComponent<Image>();
+                    if (img != null)
+                    {
+                        img.color = !hasWeapon
+                            ? UITheme.Darken(UITheme.BgMedium, 0.16f)
+                            : full
+                                ? UITheme.Darken(UITheme.BgMedium, 0.02f)
+                                : active
+                                    ? UITheme.Darken(UITheme.AccentOrange, 0.28f)
+                                    : UITheme.Darken(UITheme.AccentOrange, 0.46f);
+                    }
+                }
+
+                if (row.TitleText != null)
+                {
+                    row.TitleText.text = hasWeapon
+                        ? $"SLOT {row.Slot + 1} - {(weapon != null ? weapon.weaponName.ToUpperInvariant() : "UNKNOWN")}{(active ? " (ACTIVE)" : "")}"
+                        : $"SLOT {row.Slot + 1} - EMPTY";
+                }
+
+                if (row.StatusText != null)
+                {
+                    row.StatusText.text = hasWeapon
+                        ? (reserveSpace == int.MaxValue
+                            ? $"Loaded {currentAmmo} | Reserve {reserveAmmo} / ∞"
+                            : $"Loaded {currentAmmo} | Reserve {reserveAmmo} / {reserveAmmo + reserveSpace}")
+                        : "No weapon equipped";
+                }
+
+                if (row.ButtonLabel != null)
+                {
+                    row.ButtonLabel.text = !hasWeapon
+                        ? "NO WEAPON"
+                        : full
+                            ? "FULL"
+                            : $"BUY AMMO ({AmmoRefillCost})";
+                }
+
+                if (row.BuyButton != null)
+                {
+                    bool canAfford = PointsSystem.Instance != null && PointsSystem.Instance.CanAfford(AmmoRefillCost);
+                    row.BuyButton.interactable = hasWeapon && !full && canAfford;
+                }
+            }
+        }
+
         private void OnContinueToNextNight()
         {
+            UnhookPlayerShootingEvents();
             HidePanel(_dawnShopPanel);
             Time.timeScale = 1f;
             GameManager.Instance?.AdvanceToNextNight();
@@ -1402,6 +1850,8 @@ namespace Deadlight.UI
         {
             HidePanel(_levelCompletePanel);
             Time.timeScale = 1f;
+            _purchasedWeapons.Clear();
+            PlayerUpgrades.Instance?.ResetUpgrades();
             GameManager.Instance?.StartNextLevel();
         }
 
@@ -1418,24 +1868,44 @@ namespace Deadlight.UI
                     kills = stats.enemiesKilled;
                     earned = stats.totalEarned;
                 }
-                int next = Mathf.Min(level + 1, GameManager.TotalLevels);
-                string nextMap = levelMapNames[Mathf.Clamp(next - 1, 0, levelMapNames.Length - 1)];
-                string nextObj = next > level
-                    ? levelObjectiveSummaries[Mathf.Clamp(next - 1, 0, levelObjectiveSummaries.Length - 1)]
-                    : "Final containment cleared.";
-                float carryRatio = Mathf.Clamp01(GameManager.Instance.GetProjectedCarryoverRatio());
-                string carryText = carryRatio >= 0.999f
-                    ? "Points carryover: 100%"
-                    : $"Points carryover: {Mathf.RoundToInt(carryRatio * 100f)}%";
-                if (GameManager.Instance.PendingObjectiveCarryoverPenaltyStacks > 0)
+
+                int loreFound = 0;
+                int loreTotal = 0;
+                if (EnvironmentalLore.Instance != null)
                 {
-                    carryText += " (objective penalty)";
+                    loreFound = EnvironmentalLore.Instance.DiscoveredLoreCount;
+                    loreTotal = EnvironmentalLore.Instance.TotalLoreCount;
                 }
 
+                float runTime = Mathf.Max(0f, Time.realtimeSinceStartup - GameManager.Instance.RunStartTime);
+                int minutes = Mathf.FloorToInt(runTime / 60f);
+                int seconds = Mathf.FloorToInt(runTime % 60f);
+
+                int levelCap = GameManager.Instance.PlayableLevelCap;
+                int next = Mathf.Min(level + 1, GameManager.TotalLevels);
+                bool hasNextPlayableLevel = next > level && next <= levelCap;
+                string nextMap = hasNextPlayableLevel
+                    ? levelMapNames[Mathf.Clamp(next - 1, 0, levelMapNames.Length - 1)]
+                    : "Campaign complete";
+                string nextObj = hasNextPlayableLevel
+                    ? levelObjectiveSummaries[Mathf.Clamp(next - 1, 0, levelObjectiveSummaries.Length - 1)]
+                    : "All four sectors are secure. Stand by for the final debrief.";
+                string nextDeploymentText = hasNextPlayableLevel
+                    ? $"Level {next} - {nextMap}"
+                    : nextMap;
+                string resetText = "Next level starts fresh: points, upgrades, and purchased loadout reset.";
+
                 _levelCompleteStatsText.text =
-                    $"Level {level} - {map} cleared!\n\n" +
-                    $"Enemies Killed: {kills}\nPoints Earned: {earned}\n\n" +
-                    $"Next: Level {next} - {nextMap}\n{nextObj}\n{carryText}";
+                    $"Congratulations. Level {level} - {map} is complete.\n" +
+                    "EVAC Command has confirmed the sector handoff.\n\n" +
+                    $"Enemies Killed: {kills}\n" +
+                    $"Points Earned: {earned}\n" +
+                    $"Lore Found: {loreFound}/{loreTotal}\n" +
+                    $"Run Time: {minutes}:{seconds:D2}\n\n" +
+                    $"Next Deployment: {nextDeploymentText}\n" +
+                    $"{nextObj}\n" +
+                    $"{resetText}\n\n" +
+                    "You can deploy immediately or return to the main menu and select the next level.";
             }
             ShowPanel(_levelCompletePanel);
             Time.timeScale = 0f;
@@ -1484,22 +1954,73 @@ namespace Deadlight.UI
 
             for (int i = 0; i < 10; i++)
             {
-                var entryText = _leaderboardPanel.transform.Find($"Entry_{i}")?.GetComponent<Text>();
-                if (entryText == null) continue;
+                if (i >= _leaderboardRows.Count) break;
+                var row = _leaderboardRows[i];
+                if (row == null) continue;
 
                 if (entries != null && i < entries.Count)
                 {
                     var e = entries[i];
-                    string vm = e.victory ? " \u2605" : "";
-                    entryText.text = $"#{i + 1}      {e.score}      {e.nightsReached}      {e.kills}      {e.map}{vm}";
-                    entryText.color = e.victory ? UITheme.AccentGold : UITheme.TextPrimary;
+                    string suffix = e.victory ? "  STAR" : string.Empty;
+                    if (row.RankText != null) row.RankText.text = $"#{i + 1:00}";
+                    if (row.ScoreText != null) row.ScoreText.text = e.score.ToString();
+                    if (row.NightsText != null) row.NightsText.text = e.nightsReached.ToString();
+                    if (row.KillsText != null) row.KillsText.text = e.kills.ToString();
+                    if (row.MapText != null) row.MapText.text = $"{GetMapDisplayName(ParseMapType(e.map))}{suffix}";
+
+                    Color emphasis = e.victory ? UITheme.AccentGold : UITheme.TextPrimary;
+                    if (row.RankText != null) row.RankText.color = emphasis;
+                    if (row.ScoreText != null) row.ScoreText.color = emphasis;
+                    if (row.NightsText != null) row.NightsText.color = UITheme.TextSecondary;
+                    if (row.KillsText != null) row.KillsText.color = UITheme.TextSecondary;
+                    if (row.MapText != null) row.MapText.color = e.victory ? UITheme.Brighten(UITheme.AccentGold, 0.08f) : UITheme.TextSecondary;
+                    if (row.Background != null) row.Background.color = e.victory
+                        ? UITheme.Darken(UITheme.AccentGold, 0.72f)
+                        : (i % 2 == 0 ? UITheme.BgLight : UITheme.Darken(UITheme.BgLight, 0.12f));
                 }
                 else
                 {
-                    entryText.text = $"#{i + 1}      ---";
-                    entryText.color = UITheme.TextMuted;
+                    if (row.RankText != null) row.RankText.text = $"#{i + 1:00}";
+                    if (row.ScoreText != null) row.ScoreText.text = "---";
+                    if (row.NightsText != null) row.NightsText.text = "--";
+                    if (row.KillsText != null) row.KillsText.text = "--";
+                    if (row.MapText != null) row.MapText.text = "No recorded run";
+
+                    if (row.RankText != null) row.RankText.color = UITheme.TextMuted;
+                    if (row.ScoreText != null) row.ScoreText.color = UITheme.TextMuted;
+                    if (row.NightsText != null) row.NightsText.color = UITheme.TextMuted;
+                    if (row.KillsText != null) row.KillsText.color = UITheme.TextMuted;
+                    if (row.MapText != null) row.MapText.color = UITheme.TextMuted;
+                    if (row.Background != null) row.Background.color = i % 2 == 0
+                        ? UITheme.BgLight
+                        : UITheme.Darken(UITheme.BgLight, 0.12f);
                 }
             }
+        }
+
+        private static MapType ParseMapType(string mapName)
+        {
+            if (string.IsNullOrWhiteSpace(mapName))
+            {
+                return MapType.TownCenter;
+            }
+
+            if (Enum.TryParse(mapName, true, out MapType parsed))
+            {
+                return parsed;
+            }
+
+            return mapName.Replace(" ", string.Empty) switch
+            {
+                "TownCenter" => MapType.TownCenter,
+                "Suburban" => MapType.Suburban,
+                "SuburbanOutskirts" => MapType.Suburban,
+                "Industrial" => MapType.Industrial,
+                "IndustrialDistrict" => MapType.Industrial,
+                "Research" => MapType.Research,
+                "ResearchComplex" => MapType.Research,
+                _ => MapType.TownCenter
+            };
         }
 
         // =====================================================================
@@ -1508,7 +2029,13 @@ namespace Deadlight.UI
 
         private void OnGameStateChanged(GameState state)
         {
+            HookPointsSystemEvents();
             HideAllPanelsFade();
+
+            if (state == GameState.DawnPhase)
+            {
+                HookPlayerShootingEvents();
+            }
 
             switch (state)
             {
@@ -1521,6 +2048,11 @@ namespace Deadlight.UI
                     ShowPanel(_mainMenuPanel);
                     break;
                 case GameState.DayPhase:
+                    if (GameManager.Instance != null && GameManager.Instance.NightWithinLevel == 1)
+                    {
+                        _purchasedWeapons.Clear();
+                    }
+                    break;
                 case GameState.NightPhase:
                 case GameState.Transition:
                     break;
@@ -1533,11 +2065,108 @@ namespace Deadlight.UI
                     ShowLevelComplete();
                     break;
                 case GameState.GameOver:
+                    GameEffects.Instance?.ClearScreenOverlays();
                     HandleEndingState(false);
                     break;
                 case GameState.Victory:
+                    GameEffects.Instance?.ClearScreenOverlays();
                     HandleEndingState(true);
                     break;
+            }
+        }
+
+        private void HookPointsSystemEvents()
+        {
+            var current = PointsSystem.Instance;
+            if (_observedPointsSystem == current)
+            {
+                return;
+            }
+
+            if (_observedPointsSystem != null)
+            {
+                _observedPointsSystem.OnPointsChanged -= OnPointsChanged;
+            }
+
+            _observedPointsSystem = current;
+            if (_observedPointsSystem != null)
+            {
+                _observedPointsSystem.OnPointsChanged += OnPointsChanged;
+            }
+        }
+
+        private void UnhookPointsSystemEvents()
+        {
+            if (_observedPointsSystem == null)
+            {
+                return;
+            }
+
+            _observedPointsSystem.OnPointsChanged -= OnPointsChanged;
+            _observedPointsSystem = null;
+        }
+
+        private void OnPointsChanged(int _)
+        {
+            if (_dawnShopPanel != null && _dawnShopPanel.activeSelf)
+            {
+                UpdateShopDisplay();
+            }
+        }
+
+        private void HookPlayerShootingEvents()
+        {
+            var current = GetPlayerShooting();
+            if (_observedPlayerShooting == current)
+            {
+                return;
+            }
+
+            UnhookPlayerShootingEvents();
+            _observedPlayerShooting = current;
+            if (_observedPlayerShooting != null)
+            {
+                _observedPlayerShooting.OnAmmoChanged += OnPlayerAmmoChanged;
+                _observedPlayerShooting.OnWeaponChanged += OnPlayerWeaponChanged;
+            }
+        }
+
+        private void UnhookPlayerShootingEvents()
+        {
+            if (_observedPlayerShooting == null)
+            {
+                return;
+            }
+
+            _observedPlayerShooting.OnAmmoChanged -= OnPlayerAmmoChanged;
+            _observedPlayerShooting.OnWeaponChanged -= OnPlayerWeaponChanged;
+            _observedPlayerShooting = null;
+        }
+
+        private static PlayerShooting GetPlayerShooting()
+        {
+            var player = GameObject.FindGameObjectWithTag("Player");
+            if (player == null)
+            {
+                player = GameObject.Find("Player");
+            }
+
+            return player != null ? player.GetComponent<PlayerShooting>() : null;
+        }
+
+        private void OnPlayerAmmoChanged(int _, int __)
+        {
+            if (_dawnShopPanel != null && _dawnShopPanel.activeSelf)
+            {
+                UpdateShopDisplay();
+            }
+        }
+
+        private void OnPlayerWeaponChanged(WeaponData _)
+        {
+            if (_dawnShopPanel != null && _dawnShopPanel.activeSelf)
+            {
+                UpdateShopDisplay();
             }
         }
 
@@ -1640,14 +2269,15 @@ namespace Deadlight.UI
             string map = GameManager.Instance != null
                 ? GameUI.GetMapDisplayName(GameManager.Instance.SelectedMap) : "Town Center";
 
-            int kills = 0, earned = 0, cleared = GameManager.TotalLevels;
+            int kills = 0, earned = 0;
             if (PointsSystem.Instance != null)
             {
                 var stats = PointsSystem.Instance.GetGameStats();
                 kills = stats.enemiesKilled;
                 earned = stats.totalEarned;
-                cleared = stats.nightsSurvived;
             }
+
+            int cleared = GameManager.Instance != null ? GameManager.Instance.PlayableLevelCap : 2;
 
             int rank = -1, score = 0;
             if (LeaderboardManager.Instance != null && LeaderboardManager.Instance.Entries.Count > 0)
@@ -1660,7 +2290,7 @@ namespace Deadlight.UI
             }
 
             _statsText.text =
-                $"ALL {cleared} LEVELS CLEARED!\n" +
+                $"ALL {cleared} PLAYABLE LEVELS CLEARED!\n" +
                 "Subject 23 defeated. Extraction signal is live.\n" +
                 $"Enemies Killed: {kills}\nPoints Earned: {earned}\n" +
                 $"Map: {map}" +
