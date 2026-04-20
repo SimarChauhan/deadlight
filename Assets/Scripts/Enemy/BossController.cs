@@ -309,6 +309,8 @@ namespace Deadlight.Enemy
         
         void OnDestroy()
         {
+            StopAllCoroutines();
+
             if (health != null)
             {
                 health.OnDamageTaken -= OnDamaged;

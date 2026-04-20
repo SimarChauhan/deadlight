@@ -1,3 +1,4 @@
+using System;
 using UnityEngine;
 using UnityEngine.UI;
 using Deadlight.Core;
@@ -68,6 +69,7 @@ namespace Deadlight.UI
         private Text _levelCompleteStatsText;
         private readonly List<CampaignRouteRowBinding> _campaignRouteRows = new List<CampaignRouteRowBinding>();
         private readonly List<CampaignCardBinding> _campaignCards = new List<CampaignCardBinding>();
+        private readonly List<LeaderboardRowBinding> _leaderboardRows = new List<LeaderboardRowBinding>();
 
         private bool _waitingForEnding;
         private bool _resumeGameplayOnGuideClose;
@@ -117,6 +119,16 @@ namespace Deadlight.UI
             public Text StatusText;
             public Button BuyButton;
             public Text ButtonLabel;
+        }
+
+        private sealed class LeaderboardRowBinding
+        {
+            public Image Background;
+            public Text RankText;
+            public Text ScoreText;
+            public Text NightsText;
+            public Text KillsText;
+            public Text MapText;
         }
 
         public bool IsGuideOpen => _guidePanel != null && _guidePanel.activeSelf;
@@ -315,12 +327,12 @@ namespace Deadlight.UI
             UIFactory.CreateTextAt(left.transform, "Subtitle", "Survival After Dark",
                 UITheme.FontHeading, UITheme.WithAlpha(UITheme.TextPrimary, 0.85f),
                 new Vector2(0f, 1f), new Vector2(26f, -96f), new Vector2(400f, 32f),
-                TextAnchor.UpperLeft);
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             UIFactory.CreateTextAt(left.transform, "Body",
                 "Four playable districts, twelve objective nights, and a final containment push now make up the full campaign route.",
                 UITheme.FontBody, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(26f, -148f), new Vector2(480f, 80f),
+                new Vector2(0f, 1f), new Vector2(26f, -148f), new Vector2(490f, 92f),
                 TextAnchor.UpperLeft);
 
             UIFactory.CreateTextAt(left.transform, "ProgressLabel", "NEXT DEPLOYMENT",
@@ -337,17 +349,17 @@ namespace Deadlight.UI
             UIFactory.CreateActionButton(left.transform, "StartBtn", "Select Level",
                 "Choose your unlocked level and deploy manually.",
                 UITheme.AccentGreen, new Vector2(0f, 1f), new Vector2(24f, -344f),
-                new Vector2(500f, 86f), ShowCampaignMap);
+                new Vector2(500f, 92f), ShowCampaignMap);
 
             UIFactory.CreateActionButton(left.transform, "MapBtn", "Level Select",
                 "Deploy to any unlocked level and preview the full route.",
                 UITheme.AccentGold, new Vector2(0f, 1f), new Vector2(24f, -442f),
-                new Vector2(500f, 86f), ShowCampaignMap);
+                new Vector2(500f, 92f), ShowCampaignMap);
 
             UIFactory.CreateActionButton(left.transform, "GuideBtn", "Guide",
                 "Controls, systems, and survival tips.",
                 UITheme.AccentBlue, new Vector2(0f, 1f), new Vector2(24f, -540f),
-                new Vector2(500f, 86f), OpenGuideFromButton);
+                new Vector2(500f, 92f), OpenGuideFromButton);
 
             UIFactory.CreateCompactButton(left.transform, "LeaderboardBtn", "Leaderboard",
                 UITheme.Darken(UITheme.AccentBlue, 0.2f),
@@ -371,9 +383,9 @@ namespace Deadlight.UI
 
             UIFactory.CreateTextAt(right.transform, "RouteDesc",
                 "Campaign route spans four playable levels with escalating objectives and a final boss sector.",
-                UITheme.FontBody, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(24f, -72f), new Vector2(900f, 48f),
-                TextAnchor.UpperLeft);
+                UITheme.FontCaption, UITheme.TextSecondary,
+                new Vector2(0f, 1f), new Vector2(24f, -72f), new Vector2(900f, 52f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             _campaignRouteRows.Clear();
             float rowY = -148f;
@@ -389,7 +401,7 @@ namespace Deadlight.UI
             Color accent, Vector2 pos)
         {
             var row = UIFactory.CreateCard(parent, $"RouteRow_{level}",
-                new Vector2(0f, 1f), new Vector2(980f, 130f), UITheme.BgMedium);
+                new Vector2(0f, 1f), new Vector2(980f, 136f), UITheme.BgMedium);
             var rowRt = row.GetComponent<RectTransform>();
             rowRt.pivot = new Vector2(0f, 1f);
             rowRt.anchoredPosition = pos;
@@ -420,12 +432,12 @@ namespace Deadlight.UI
 
             UIFactory.CreateTextAt(row.transform, "Teaser", teaser,
                 UITheme.FontCaption, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(textX, -76f), new Vector2(600f, 42f),
-                TextAnchor.UpperLeft);
+                new Vector2(0f, 1f), new Vector2(textX, -78f), new Vector2(650f, 48f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             // Status badge
             var badge = UIFactory.CreateCard(row.transform, "StatusBadge",
-                new Vector2(1f, 0.5f), new Vector2(110f, 32f), UITheme.BgLight);
+                new Vector2(1f, 0.5f), new Vector2(126f, 36f), UITheme.BgLight);
             badge.GetComponent<RectTransform>().anchoredPosition = new Vector2(-16f, 0f);
             badge.GetComponent<RectTransform>().pivot = new Vector2(1f, 0.5f);
 
@@ -461,8 +473,8 @@ namespace Deadlight.UI
             UIFactory.CreateTextAt(_mapSelectPanel.transform, "Desc",
                 "Select any unlocked level. Clear the active sector to unlock the next deployment.",
                 UITheme.FontBody, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(54f, -158f), new Vector2(720f, 48f),
-                TextAnchor.UpperLeft);
+                new Vector2(0f, 1f), new Vector2(54f, -158f), new Vector2(760f, 52f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             _mapSelectProgressText = UIFactory.CreateTextAt(_mapSelectPanel.transform, "Progress", "",
                 UITheme.FontBody, UITheme.AccentGold,
@@ -528,12 +540,12 @@ namespace Deadlight.UI
 
             UIFactory.CreateTextAt(card.transform, "Teaser", levelTeasers[idx],
                 UITheme.FontCaption, UITheme.TextSecondary,
-                new Vector2(0f, 1f), new Vector2(16f, -198f), new Vector2(468f, 36f),
-                TextAnchor.UpperLeft);
+                new Vector2(0f, 1f), new Vector2(16f, -198f), new Vector2(468f, 44f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
             // Status badge
             var statusGo = UIFactory.CreateCard(card.transform, "StatusBadge",
-                new Vector2(1f, 0f), new Vector2(120f, 30f), UITheme.BgLight);
+                new Vector2(1f, 0f), new Vector2(132f, 34f), UITheme.BgLight);
             statusGo.GetComponent<RectTransform>().pivot = new Vector2(1f, 0f);
             statusGo.GetComponent<RectTransform>().anchoredPosition = new Vector2(-12f, 12f);
 
@@ -1174,28 +1186,82 @@ namespace Deadlight.UI
             _leaderboardPanel = UIFactory.CreateFullPanel(_canvasRoot.transform, "LeaderboardPanel",
                 new Color(0.04f, 0.04f, 0.08f, 0.96f));
 
-            UIFactory.CreateTextAt(_leaderboardPanel.transform, "Title", "LEADERBOARD",
-                UITheme.FontTitle + 2, UITheme.AccentGold,
-                new Vector2(0.5f, 0.93f), new Vector2(-220f, -10f), new Vector2(440f, 48f),
-                TextAnchor.MiddleCenter, FontStyle.Bold);
+            var frame = UIFactory.CreateCard(_leaderboardPanel.transform, "BoardFrame",
+                new Vector2(0.5f, 0.5f), new Vector2(1140f, 760f), UITheme.BgMedium);
 
-            UIFactory.CreateTextAt(_leaderboardPanel.transform, "Header",
-                "RANK    SCORE    LEVELS    KILLS    MAP",
-                UITheme.FontCaption + 1, UITheme.TextMuted,
-                new Vector2(0.5f, 0.85f), new Vector2(-360f, 0f), new Vector2(720f, 22f),
-                TextAnchor.MiddleCenter);
+            UIFactory.CreateTextAt(frame.transform, "Title", "LEADERBOARD",
+                UITheme.FontTitle + 4, UITheme.TextPrimary,
+                new Vector2(0f, 1f), new Vector2(42f, -34f), new Vector2(420f, 48f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
 
+            UIFactory.CreateTextAt(frame.transform, "Subtitle",
+                "Top campaign runs by score, nights survived, and kill count.",
+                UITheme.FontCaption, UITheme.TextSecondary,
+                new Vector2(0f, 1f), new Vector2(44f, -84f), new Vector2(620f, 26f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
+
+            float headerY = -138f;
+            CreateLeaderboardHeader(frame.transform, "RankHeader", "RANK", new Vector2(48f, headerY), 90f);
+            CreateLeaderboardHeader(frame.transform, "ScoreHeader", "SCORE", new Vector2(156f, headerY), 170f);
+            CreateLeaderboardHeader(frame.transform, "NightsHeader", "NIGHTS", new Vector2(352f, headerY), 140f);
+            CreateLeaderboardHeader(frame.transform, "KillsHeader", "KILLS", new Vector2(518f, headerY), 140f);
+            CreateLeaderboardHeader(frame.transform, "MapHeader", "DEPLOYMENT", new Vector2(684f, headerY), 360f);
+
+            _leaderboardRows.Clear();
+            float rowY = -178f;
             for (int i = 0; i < 10; i++)
             {
-                float yPos = 0.79f - i * 0.065f;
-                UIFactory.CreateTextAt(_leaderboardPanel.transform, $"Entry_{i}", "",
-                    UITheme.FontBody - 1, UITheme.TextPrimary,
-                    new Vector2(0.5f, yPos), new Vector2(-380f, 0f), new Vector2(760f, 24f),
-                    TextAnchor.MiddleCenter);
+                CreateLeaderboardRow(frame.transform, i, new Vector2(40f, rowY));
+                rowY -= 54f;
             }
 
             UIFactory.CreateCenteredButton(_leaderboardPanel.transform, "BackBtn", "BACK",
                 UITheme.BgLight, new Vector2(0.5f, 0.06f), new Vector2(180f, 42f), HideLeaderboard);
+        }
+
+        private void CreateLeaderboardHeader(Transform parent, string name, string label, Vector2 pos, float width)
+        {
+            UIFactory.CreateTextAt(parent, name, label,
+                UITheme.FontCaption, UITheme.TextMuted,
+                new Vector2(0f, 1f), pos, new Vector2(width, 20f),
+                TextAnchor.UpperLeft, FontStyle.Bold);
+        }
+
+        private void CreateLeaderboardRow(Transform parent, int index, Vector2 pos)
+        {
+            var row = UIFactory.CreateCard(parent, $"EntryRow_{index}",
+                new Vector2(0f, 1f), new Vector2(1060f, 42f),
+                index % 2 == 0 ? UITheme.BgLight : UITheme.Darken(UITheme.BgLight, 0.12f));
+            var rowRt = row.GetComponent<RectTransform>();
+            rowRt.pivot = new Vector2(0f, 1f);
+            rowRt.anchoredPosition = pos;
+
+            var binding = new LeaderboardRowBinding
+            {
+                Background = row.GetComponent<Image>(),
+                RankText = UIFactory.CreateTextAt(row.transform, "Rank", "",
+                    UITheme.FontCaption, UITheme.TextPrimary,
+                    new Vector2(0f, 1f), new Vector2(16f, -11f), new Vector2(80f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold),
+                ScoreText = UIFactory.CreateTextAt(row.transform, "Score", "",
+                    UITheme.FontCaption, UITheme.TextPrimary,
+                    new Vector2(0f, 1f), new Vector2(124f, -11f), new Vector2(150f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold),
+                NightsText = UIFactory.CreateTextAt(row.transform, "Nights", "",
+                    UITheme.FontCaption, UITheme.TextSecondary,
+                    new Vector2(0f, 1f), new Vector2(320f, -11f), new Vector2(110f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold),
+                KillsText = UIFactory.CreateTextAt(row.transform, "Kills", "",
+                    UITheme.FontCaption, UITheme.TextSecondary,
+                    new Vector2(0f, 1f), new Vector2(486f, -11f), new Vector2(110f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold),
+                MapText = UIFactory.CreateTextAt(row.transform, "Map", "",
+                    UITheme.FontCaption, UITheme.TextSecondary,
+                    new Vector2(0f, 1f), new Vector2(652f, -11f), new Vector2(380f, 20f),
+                    TextAnchor.MiddleLeft, FontStyle.Bold)
+            };
+
+            _leaderboardRows.Add(binding);
         }
 
         // =====================================================================
@@ -1263,8 +1329,8 @@ namespace Deadlight.UI
                 bool ready = unlocked && row.Level == highest;
                 row.StatusText.text = ready ? "READY" : unlocked ? "UNLOCKED" : "LOCKED";
                 row.StatusBackground.color = ready
-                    ? UITheme.Darken(UITheme.AccentGreen, 0.35f)
-                    : unlocked ? UITheme.BgLight : UITheme.Darken(UITheme.AccentRed, 0.5f);
+                    ? UITheme.Darken(UITheme.AccentGreen, 0.28f)
+                    : unlocked ? UITheme.Darken(UITheme.AccentBlue, 0.38f) : UITheme.Darken(UITheme.AccentRed, 0.42f);
             }
 
             foreach (var card in _campaignCards)
@@ -1276,7 +1342,7 @@ namespace Deadlight.UI
                 if (card.StatusText != null)
                 {
                     card.StatusText.text = ready ? "READY" : unlocked ? "UNLOCKED" : "LOCKED";
-                    card.StatusText.color = unlocked ? UITheme.TextPrimary : UITheme.TextMuted;
+                    card.StatusText.color = unlocked ? UITheme.TextPrimary : UITheme.WithAlpha(UITheme.TextPrimary, 0.92f);
                 }
                 if (card.ActionText != null)
                 {
@@ -1290,7 +1356,7 @@ namespace Deadlight.UI
                         : (unlocked ? card.FallbackColor : UITheme.Darken(card.FallbackColor, 0.3f));
                 }
                 if (card.LockOverlay != null)
-                    card.LockOverlay.color = unlocked ? Color.clear : new Color(0f, 0f, 0f, 0.3f);
+                    card.LockOverlay.color = unlocked ? Color.clear : new Color(0f, 0f, 0f, 0.38f);
             }
         }
 
@@ -1888,22 +1954,73 @@ namespace Deadlight.UI
 
             for (int i = 0; i < 10; i++)
             {
-                var entryText = _leaderboardPanel.transform.Find($"Entry_{i}")?.GetComponent<Text>();
-                if (entryText == null) continue;
+                if (i >= _leaderboardRows.Count) break;
+                var row = _leaderboardRows[i];
+                if (row == null) continue;
 
                 if (entries != null && i < entries.Count)
                 {
                     var e = entries[i];
-                    string vm = e.victory ? " \u2605" : "";
-                    entryText.text = $"#{i + 1}      {e.score}      {e.nightsReached}      {e.kills}      {e.map}{vm}";
-                    entryText.color = e.victory ? UITheme.AccentGold : UITheme.TextPrimary;
+                    string suffix = e.victory ? "  STAR" : string.Empty;
+                    if (row.RankText != null) row.RankText.text = $"#{i + 1:00}";
+                    if (row.ScoreText != null) row.ScoreText.text = e.score.ToString();
+                    if (row.NightsText != null) row.NightsText.text = e.nightsReached.ToString();
+                    if (row.KillsText != null) row.KillsText.text = e.kills.ToString();
+                    if (row.MapText != null) row.MapText.text = $"{GetMapDisplayName(ParseMapType(e.map))}{suffix}";
+
+                    Color emphasis = e.victory ? UITheme.AccentGold : UITheme.TextPrimary;
+                    if (row.RankText != null) row.RankText.color = emphasis;
+                    if (row.ScoreText != null) row.ScoreText.color = emphasis;
+                    if (row.NightsText != null) row.NightsText.color = UITheme.TextSecondary;
+                    if (row.KillsText != null) row.KillsText.color = UITheme.TextSecondary;
+                    if (row.MapText != null) row.MapText.color = e.victory ? UITheme.Brighten(UITheme.AccentGold, 0.08f) : UITheme.TextSecondary;
+                    if (row.Background != null) row.Background.color = e.victory
+                        ? UITheme.Darken(UITheme.AccentGold, 0.72f)
+                        : (i % 2 == 0 ? UITheme.BgLight : UITheme.Darken(UITheme.BgLight, 0.12f));
                 }
                 else
                 {
-                    entryText.text = $"#{i + 1}      ---";
-                    entryText.color = UITheme.TextMuted;
+                    if (row.RankText != null) row.RankText.text = $"#{i + 1:00}";
+                    if (row.ScoreText != null) row.ScoreText.text = "---";
+                    if (row.NightsText != null) row.NightsText.text = "--";
+                    if (row.KillsText != null) row.KillsText.text = "--";
+                    if (row.MapText != null) row.MapText.text = "No recorded run";
+
+                    if (row.RankText != null) row.RankText.color = UITheme.TextMuted;
+                    if (row.ScoreText != null) row.ScoreText.color = UITheme.TextMuted;
+                    if (row.NightsText != null) row.NightsText.color = UITheme.TextMuted;
+                    if (row.KillsText != null) row.KillsText.color = UITheme.TextMuted;
+                    if (row.MapText != null) row.MapText.color = UITheme.TextMuted;
+                    if (row.Background != null) row.Background.color = i % 2 == 0
+                        ? UITheme.BgLight
+                        : UITheme.Darken(UITheme.BgLight, 0.12f);
                 }
             }
+        }
+
+        private static MapType ParseMapType(string mapName)
+        {
+            if (string.IsNullOrWhiteSpace(mapName))
+            {
+                return MapType.TownCenter;
+            }
+
+            if (Enum.TryParse(mapName, true, out MapType parsed))
+            {
+                return parsed;
+            }
+
+            return mapName.Replace(" ", string.Empty) switch
+            {
+                "TownCenter" => MapType.TownCenter,
+                "Suburban" => MapType.Suburban,
+                "SuburbanOutskirts" => MapType.Suburban,
+                "Industrial" => MapType.Industrial,
+                "IndustrialDistrict" => MapType.Industrial,
+                "Research" => MapType.Research,
+                "ResearchComplex" => MapType.Research,
+                _ => MapType.TownCenter
+            };
         }
 
         // =====================================================================

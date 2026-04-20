@@ -105,7 +105,7 @@ namespace Deadlight.Systems
             return Mathf.Lerp(1f, floor, t);
         }
 
-        public void SpawnPickup(Vector3 position, PickupType type)
+        public GameObject SpawnPickup(Vector3 position, PickupType type)
         {
             type = SanitizePickupType(type);
 
@@ -129,6 +129,7 @@ namespace Deadlight.Systems
             pickupObj.AddComponent<PickupAnimation>();
 
             Destroy(pickupObj, 10f);
+            return pickupObj;
         }
 
         public static PickupType SanitizePickupType(PickupType type)
@@ -138,8 +139,12 @@ namespace Deadlight.Systems
                 return type;
             }
 
-            // Legacy crafting pickups are fully retired in campaign.
-            return PickupType.Points;
+            if (GameManager.Instance != null && !GameManager.Instance.CraftingEnabled)
+            {
+                return PickupType.Points;
+            }
+
+            return type;
         }
 
         public static bool IsCraftingPickup(PickupType type)

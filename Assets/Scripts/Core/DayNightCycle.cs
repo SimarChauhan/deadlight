@@ -71,6 +71,7 @@ namespace Deadlight.Core
         public event Action<float> OnSkyColorChanged;
 
         private bool isPaused = false;
+        private Coroutine transitionCoroutine;
         private ParticleSystem starsParticleSystem;
         private GameObject moonGlow;
         private GameObject sunIndicator;
@@ -89,6 +90,8 @@ namespace Deadlight.Core
 
         private void OnDestroy()
         {
+            CancelTransition();
+
             if (GameManager.Instance != null)
             {
                 GameManager.Instance.OnGameStateChanged -= HandleGameStateChanged;
@@ -121,6 +124,7 @@ namespace Deadlight.Core
                 case GameState.Victory:
                 case GameState.MainMenu:
                 case GameState.Transition:
+                    CancelTransition();
                     isPaused = true;
                     break;
             }
@@ -172,6 +176,7 @@ namespace Deadlight.Core
 
         public void StartDay()
         {
+            CancelTransition();
             isDay = true;
             currentTime = 0f;
             isPaused = false;
@@ -185,6 +190,7 @@ namespace Deadlight.Core
 
         public void StartNight()
         {
+            CancelTransition();
             isDay = false;
             currentTime = 0f;
             isPaused = false;
@@ -214,9 +220,25 @@ namespace Deadlight.Core
 
         private void StartTransitionToNight()
         {
+            if (transitionCoroutine != null)
+            {
+                return;
+            }
+
             isTransitioning = true;
             OnTransitionStart?.Invoke();
-            StartCoroutine(TransitionToNightCoroutineEnhanced());
+            transitionCoroutine = StartCoroutine(TransitionToNightCoroutineEnhanced());
+        }
+
+        private void CancelTransition()
+        {
+            if (transitionCoroutine != null)
+            {
+                StopCoroutine(transitionCoroutine);
+                transitionCoroutine = null;
+            }
+
+            isTransitioning = false;
         }
 
         private void SetDayLighting()
@@ -599,6 +621,7 @@ namespace Deadlight.Core
             }
 
             isTransitioning = false;
+            transitionCoroutine = null;
             GameManager.Instance?.StartNightPhase();
         }
 

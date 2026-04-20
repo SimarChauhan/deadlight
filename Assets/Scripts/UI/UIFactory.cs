@@ -22,8 +22,22 @@ namespace Deadlight.UI
         public static Font GetFont()
         {
             if (_cachedFont != null) return _cachedFont;
-            _cachedFont = Font.CreateDynamicFontFromOSFont("Arial", 16);
-            if (_cachedFont != null) return _cachedFont;
+            string[] preferredFonts =
+            {
+                "Aptos",
+                "Segoe UI",
+                "Helvetica Neue",
+                "Verdana",
+                "Tahoma",
+                "Arial"
+            };
+
+            for (int i = 0; i < preferredFonts.Length; i++)
+            {
+                _cachedFont = Font.CreateDynamicFontFromOSFont(preferredFonts[i], 16);
+                if (_cachedFont != null) return _cachedFont;
+            }
+
             _cachedFont = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
             if (_cachedFont != null) return _cachedFont;
             string[] names = Font.GetOSInstalledFontNames();
@@ -114,7 +128,17 @@ namespace Deadlight.UI
             txt.alignment = align;
             txt.horizontalOverflow = HorizontalWrapMode.Wrap;
             txt.verticalOverflow = VerticalWrapMode.Overflow;
+            txt.lineSpacing = fontSize <= UITheme.FontCaption ? 1.12f : 1.06f;
+            txt.supportRichText = true;
             txt.raycastTarget = false;
+
+            var shadow = go.AddComponent<Shadow>();
+            shadow.effectColor = UITheme.TextShadow;
+            shadow.effectDistance = fontSize <= UITheme.FontCaption
+                ? new Vector2(0.8f, -0.8f)
+                : new Vector2(1.2f, -1.2f);
+            shadow.useGraphicAlpha = true;
+
             return txt;
         }
 
@@ -188,8 +212,8 @@ namespace Deadlight.UI
             if (!string.IsNullOrEmpty(subtitle))
             {
                 CreateTextAt(go.transform, "Subtitle", subtitle, UITheme.FontCaption,
-                    UITheme.TextSecondary, new Vector2(0f, 1f), new Vector2(22f, -44f),
-                    new Vector2(size.x - 40f, 40f), TextAnchor.UpperLeft);
+                    UITheme.TextSecondary, new Vector2(0f, 1f), new Vector2(22f, -46f),
+                    new Vector2(size.x - 40f, 44f), TextAnchor.UpperLeft, FontStyle.Bold);
             }
 
             return btn;
